@@ -57,6 +57,8 @@ M.setup = function(user_opts)
         M.config = M.default_config
     end
 
+    core.hl.init_hl_group()
+
     vim.api.nvim_create_user_command(
         'Como',
         function(opts)

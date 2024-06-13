@@ -1,9 +1,12 @@
-local buf_util = require('como.buffer')
 local M = {}
+
+M.buf = require('como.buffer')
+M.mh = require('como.matcher')
+M.hl = require('como.highlight')
 
 
 M.compile = function(cmd)
-    local buf = buf_util.buf_open()
+    local buf = M.buf.buf_open()
 
     -- Clear the buffer content
     vim.api.nvim_buf_set_option(buf, 'modifiable', true)
@@ -17,16 +20,41 @@ M.compile = function(cmd)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {begin_msg, start_time_msg, '', cmd})
     vim.api.nvim_buf_set_option(buf, 'modifiable', false)
 
-
+    local line_nr = 3
     -- Define the callback for the job
     local function on_output(_, data, _)
         if data then
             for _, line in ipairs(data) do
                 -- Remove empty strings from the data
                 if line ~= "" then
+                    line_nr = line_nr + 1
+                    print(string.format("%d: %s", line_nr, line))
+
                     vim.api.nvim_buf_set_option(buf, 'modifiable', true)
                     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {line})
                     vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+
+                    local result = M.mh.parse_line(line)
+                    print(vim.inspect(result))
+                    local hl_group
+                    if result ~= nil then
+                        if result.qtype == "warning" then
+                            hl_group = 'Como_hl_warn'
+                        elseif result.qtype == "error" then
+                            hl_group = 'Como_hl_error'
+                        else
+                            hl_group = 'Normal'
+                        end
+                    end
+                    if result ~= nil then
+                        local rc = result.lnum .. ':' .. result.col
+                        local start_col, end_col = string.find(line, rc)
+                        -- @function: apply_highlight(bufnr, hl_group, line, start_col, end_col)
+                        M.hl.apply_highlight(buf, hl_group, line_nr, tonumber(start_col)-1, tonumber(end_col))
+                        M.hl.apply_highlight(buf, 'Como_hl_filename', line_nr, 0, 6)
+                        -- print('start: ' .. start_col)
+                        -- print('end: ' .. end_col)
+                    end
                 end
             end
         end
@@ -62,7 +90,7 @@ M.recompile = function(cmd)
 end
 
 M.open_como_buffer = function()
-    buf_util.buf_open()
+    M.buf.buf_open()
 end
 
 -- Example usage
