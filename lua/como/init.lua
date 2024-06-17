@@ -4,7 +4,8 @@ local hl = require('como.highlight')
 local M = {}
 
 M.default_config = {
-    show_last_cmd = true
+    show_last_cmd = true,
+    auto_scroll = true
 }
 
 M.last_command = ""

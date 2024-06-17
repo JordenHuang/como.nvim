@@ -1,11 +1,9 @@
 local M = {}
 
-local Pos = {
-    name = 1,
-    start_col = 2,
-    end_col = 3,
-    data = 4
-}
+local mh = require('como.matcher')
+
+local Pos = mh.Pos
+
 
 M.default_hl_val = {
     -- warning = { link = "DiagnosticSignWarn", underline = true },

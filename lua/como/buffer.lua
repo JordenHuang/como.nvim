@@ -3,15 +3,11 @@ local M = {}
 
 local mh = require('como.matcher')
 local uv = vim.uv or vim.loop
+local Pos = mh.Pos
 
-local Pos = {
-    name = 1,
-    start_col = 2,
-    end_col = 3,
-    data = 4
-}
 
 M.buf = false
+M.win = false
 
 M.if_buf_is_valid = function(buf_to_check)
     -- If the buffer is never created
@@ -19,14 +15,28 @@ M.if_buf_is_valid = function(buf_to_check)
         return false
     end
 
-    -- Check if the previous buffer exists
+    local flag = false
+    -- Check if the previous buffer in buffer-list
     local bufs = vim.api.nvim_list_bufs()
     for _, buf in pairs(bufs) do
         -- print(buf)
         if buf_to_check == buf then
-            return true
+            flag = true
         end
     end
+
+    -- if not flag, means the buffer is not in buffer-list
+    if flag then
+        -- Check buffer is valid and loaded
+        local b = vim.api.nvim_buf_is_loaded(buf_to_check)
+        -- print("loaded: ", b)
+        if b == true then
+            return true
+        else
+            vim.api.nvim_buf_delete(buf_to_check, {})
+        end
+    end
+
     return false
 end
 
@@ -51,13 +61,14 @@ M.create_buf = function()
     vim.api.nvim_buf_set_name(buf, "Compilation mode")
     vim.api.nvim_buf_set_option(buf, 'buftype', 'nofile')
     vim.api.nvim_buf_set_option(buf, 'modifiable', false)
-    -- vim.api.nvim_buf_set_option(buf, 'bufhidden', 'wipe')
     vim.api.nvim_buf_set_option(buf, 'swapfile', false)
     vim.api.nvim_buf_set_option(buf, 'buflisted', false)
 
     vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ":q<CR>", {silent=true, noremap=true, desc="close como window"})
     -- Jump to file when hit enter
     vim.api.nvim_buf_set_keymap(buf, 'n', "<CR>", ":lua require('como.buffer').jump_to_file()<CR>", {silent=true, noremap=true, desc="como jump to file"})
+    -- Quit program when hit Ctrl+c
+    vim.api.nvim_buf_set_keymap(buf, 'n', "<C-c>", ":lua require('como.core').quit_program()<CR>", {silent=true, noremap=true, desc="como quit program"})
 
     M.buf = buf
     return buf
@@ -78,7 +89,9 @@ M.buf_open = function()
         vim.api.nvim_command('topleft split')
         local win = vim.api.nvim_get_current_win()
         vim.api.nvim_win_set_buf(win, buf)
+        M.win = win
     end
+
     return buf
 end
 
@@ -133,6 +146,12 @@ M.jump_to_file = function()
 end
 
 -- By Chat-GPT
+--[[
+1. Check if the file is already open in one of the windows.
+2. Focus the window if the file is already open,
+    or Open a new window below and open the file if it's not already open.
+3. Set the cursor to a specific (row, col) position.
+--]]
 M.open_file_and_set_cursor = function(file_path, row, col)
     local is_file_open = false
     local win_id = nil
@@ -162,6 +181,23 @@ M.open_file_and_set_cursor = function(file_path, row, col)
         vim.api.nvim_win_set_cursor(0, {row, col-1})
     else
         vim.api.nvim_win_set_cursor(0, {row, 0})
+    end
+end
+
+
+-- Auto scroll down
+M.check_and_auto_scroll = function()
+    if vim.api.nvim_get_current_win() ~= M.win then
+        -- print('not same win')
+        return
+    end
+
+    -- Get cursor's row position and number of lines in the compilation buffer
+    local row = vim.api.nvim_win_get_cursor(M.win)[1]
+
+    local line_count = vim.api.nvim_buf_line_count(M.buf)
+    if row == (line_count-1) then
+        vim.api.nvim_win_set_cursor(0, {line_count, 0})
     end
 end
 

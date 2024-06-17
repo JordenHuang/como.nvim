@@ -21,6 +21,13 @@ M.matcher_set = {
     },
 }
 
+M.Pos = {
+    name = 1,
+    start_col = 2,
+    end_col = 3,
+    data = 4
+}
+
 M.parse_line = function(line)
     for mname, matcher in pairs(M.matcher_set) do
         local res = {}
