@@ -148,12 +148,14 @@ end
 --[[
 1. Check if the file is already open in one of the windows.
 2. Focus the window if the file is already open,
+    or use the last window which is opened by this function, if it exist,
     or Open a new window below and open the file if it's not already open.
 3. Set the cursor to a specific (row, col) position.
 --]]
 M.open_file_and_set_cursor = function(file_path, row, col)
     local is_file_open = false
     local win_id = nil
+    local has_last_win = false
 
     -- Iterate over all windows to check if the file is already open
     for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -163,16 +165,25 @@ M.open_file_and_set_cursor = function(file_path, row, col)
             is_file_open = true
             win_id = win
             break
+        elseif win == M.jmp_to_file_win then
+            has_last_win = true
+            win_id = win
+            break
         end
     end
 
     if is_file_open then
         -- Focus the window where the file is open
         vim.api.nvim_set_current_win(win_id)
+    elseif has_last_win then
+        -- If last used window exist, use that window
+        vim.api.nvim_set_current_win(win_id)
+        vim.cmd('edit ' .. file_path)
     else
         -- Open a new window below and open the file
         vim.cmd('belowright split ' .. file_path)
     end
+    M.jmp_to_file_win = vim.api.nvim_get_current_win()
 
     -- Set the cursor position
     if col then
