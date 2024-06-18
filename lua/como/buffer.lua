@@ -67,7 +67,7 @@ M.create_buf = function()
     -- Jump to file when hit enter
     vim.api.nvim_buf_set_keymap(buf, 'n', "<CR>", ":lua require('como.buffer').jump_to_file()<CR>", {silent=true, noremap=true, desc="como jump to file"})
     -- Quit program when hit Ctrl+c
-    vim.api.nvim_buf_set_keymap(buf, 'n', "<C-c>", ":lua require('como.core').quit_program()<CR>", {silent=true, noremap=true, desc="como quit program"})
+    vim.api.nvim_buf_set_keymap(buf, 'n', "<C-c>", ":lua require('como').quit_program()<CR>", {silent=true, noremap=true, desc="como quit program"})
 
     M.buf = buf
     return buf
@@ -143,6 +143,7 @@ M.jump_to_file = function()
         return nil
     end
 end
+
 
 -- By Chat-GPT
 --[[

@@ -1,3 +1,4 @@
+-- Maybe add ignore filenames, like when using the wrong command, the /bin/bash is jumpable in the como buffer
 local M = {}
 
 local bf = require('como.buffer')
@@ -83,13 +84,17 @@ M.compile = function(cmd)
             vim.api.nvim_buf_set_option(buf, 'modifiable', true)
             vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', end_msg})
             vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+            -- Print the msg out and clear it after 1.75 seconds
             print("Compilation finished")
+            vim.fn.timer_start(1750, function() vim.cmd([[echon ' ']]) end)
         else
             local err_msg = string.format("Compilation exited abnormally with code %d at %s", exit_code, os.date("%a %b %d %X"))
             vim.api.nvim_buf_set_option(buf, 'modifiable', true)
             vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', err_msg})
             vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+            -- Print the msg out and clear it after 1.75 seconds
             print("Compilation exited abnormally with code", exit_code)
+            vim.fn.timer_start(1750, function() vim.cmd([[echon ' ']]) end)
         end
 
         if M.config.auto_scroll then

@@ -19,6 +19,14 @@ M.matcher_set = {
             [3] = "message"
         }
     },
+    shell = {
+        pattern = "(%S+): line (%d+): (.+)",
+        parts = {
+            "filename",
+            "lnum",
+            "message"
+        }
+    },
 }
 
 M.Pos = {
