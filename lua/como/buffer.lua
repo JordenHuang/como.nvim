@@ -1,4 +1,3 @@
--- TODO: set auto scroll when at the last line, else don't scroll
 local M = {}
 
 local mh = require('como.matcher')

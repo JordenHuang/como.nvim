@@ -1,12 +1,28 @@
 local M = {}
 
-local buf_util = require('como.buffer')
+local bf = require('como.buffer')
 local mh = require('como.matcher')
 local hl = require('como.highlight')
 
 
+M.default_config = {
+    show_last_cmd = true,
+    auto_scroll = true
+}
+
+M.config = {}
+
+M.last_command = ""
+
+M.commands = {
+    "compile",
+    "recompile",
+    "open"
+}
+
+
 M.compile = function(cmd)
-    local buf = buf_util.buf_open()
+    local buf = bf.buf_open()
 
     -- Clear the buffer content
     vim.api.nvim_buf_set_option(buf, 'modifiable', true)
@@ -20,8 +36,11 @@ M.compile = function(cmd)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {begin_msg, start_time_msg, '', cmd})
     vim.api.nvim_buf_set_option(buf, 'modifiable', false)
 
-    -- line indexing is zero-based
+    -- line indexing is zero-based, so 3 means it's line number 4
     local line_nr = 3
+    if M.config.auto_scroll then
+        vim.api.nvim_win_set_cursor(0, {line_nr+1, 0})
+    end
 
     -- Define the callback for the job
     local function on_output(_, data, _)
@@ -43,17 +62,20 @@ M.compile = function(cmd)
                     -- Adding highlight to the text
                     hl.highlight_logic(result, buf, line_nr)
 
-                    -- Check cursor position, and auto scroll the window
-                    buf_util.check_and_auto_scroll()
+                    if M.config.auto_scroll then
+                        -- Check cursor position, and auto scroll the window
+                        bf.check_and_auto_scroll()
+                    end
                 end
             end
         end
     end
 
     local function on_exit(_, exit_code, _)
+        -- This variable is for auto scroll
         -- Get the current row
         -- for checking if it needs to scroll to the bottom when compilation finished
-        local row = vim.api.nvim_win_get_cursor(buf_util.win)[1]
+        local row = vim.api.nvim_win_get_cursor(bf.win)[1]
 
         -- Write end message to buffer
         if exit_code == 0 then
@@ -70,10 +92,12 @@ M.compile = function(cmd)
             print("Compilation exited abnormally with code", exit_code)
         end
 
-        -- To scroll to end of the buffer
-        local line_count = vim.api.nvim_buf_line_count(buf)
-        if row == (line_count - 2) then
-            vim.api.nvim_win_set_cursor(0, {line_count, 0})
+        if M.config.auto_scroll then
+            -- To scroll to end of the buffer
+            local line_count = vim.api.nvim_buf_line_count(buf)
+            if row == (line_count - 2) then
+                vim.api.nvim_win_set_cursor(0, {line_count, 0})
+            end
         end
     end
 
@@ -92,16 +116,80 @@ M.recompile = function(cmd)
 end
 
 M.open_como_buffer = function()
-    buf_util.buf_open()
+    bf.buf_open()
 end
 
 M.quit_program = function()
+    -- Ctrl+c to quit program
+    -- see como/buffer.lua
     if M.job_id then
         vim.fn.jobstop(M.job_id)
         -- print('Job stopped:', M.job_id)
     -- else
     --     print('Invalid job ID')
     end
+end
+
+
+M.determine_mode = function(opts)
+    -- print("'" .. opts.args .. "'")
+
+    -- Compile
+    if opts.args == M.commands[1] then
+        -- local default = M.config.show_last_cmd and M.last_command or ''
+        local default
+        if not M.config.show_last_cmd then
+            default = ''
+        else
+            default = M.last_command
+        end
+
+        vim.ui.input(
+            { prompt = "Compile command: ", default = default, completion = "file"},
+            function(cmd)
+                if cmd == nil or cmd == '' then
+                    print("Empty input, abort")
+                    return
+                end
+                M.compile(cmd)
+                M.last_command = cmd
+            end
+        )
+    -- Recompile
+    elseif opts.args == M.commands[2] then
+        if M.last_command == '' then
+            print("No last command, compile first")
+            return
+        end
+        M.recompile(M.last_command)
+    -- Open como buffer
+    elseif opts.args == M.commands[3] then
+        M.open_como_buffer()
+    end
+end
+
+M.setup = function(user_opts)
+    if user_opts then
+        M.config = vim.tbl_deep_extend("force", M.default_config, user_opts)
+    else
+        M.config = M.default_config
+    end
+
+    hl.init_hl_group()
+
+    vim.api.nvim_create_user_command(
+        'Como',
+        function(opts)
+            M.determine_mode(opts)
+        end,
+        {
+            nargs = 1,
+            complete = function()
+                -- return completion candidates as a list-like table
+                return M.commands
+            end,
+        }
+    )
 end
 
 return M

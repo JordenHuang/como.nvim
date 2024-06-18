@@ -4,19 +4,19 @@ M.matcher_set = {
     gcc = {
         pattern = "(%S+):(%d+):(%d+): (%S+): (.+)",
         parts = {
-            [1] = "filename",
-            [2] = "lnum",
-            [3] = "col",
-            [4] = "qtype",
-            [5] = "message"
+            "filename",
+            "lnum",
+            "col",
+            "qtype",
+            "message"
         }
     },
     python = {
         pattern = "  File \"(%S+)\", line (%d+), (.+)",
         parts = {
-            "filename",
-            "lnum",
-            "message"
+            [1] = "filename",
+            [2] = "lnum",
+            [3] = "message"
         }
     },
 }
@@ -32,7 +32,7 @@ M.parse_line = function(line)
     for mname, matcher in pairs(M.matcher_set) do
         local res = {}
         local values = { string.match(line, matcher.pattern) }
-        -- for a, b in ipairs(parts) do
+        -- for a, b in ipairs(values) do
         --     print(a, b)
         -- end
 
