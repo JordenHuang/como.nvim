@@ -8,12 +8,15 @@ local hl = require('como.highlight')
 
 M.default_config = {
     show_last_cmd = true,
-    auto_scroll = true
+    auto_scroll = true,
+    custom_matchers = {}
 }
 
 M.config = {}
 
 M.last_command = ""
+
+M.job_id = nil
 
 M.commands = {
     "compile",
@@ -23,6 +26,10 @@ M.commands = {
 
 
 M.compile = function(cmd)
+    if M.job_id then
+        vim.notify("Last command still running!", vim.log.levels.ERROR)
+        return
+    end
     local buf = bf.buf_open()
 
     -- Clear the buffer content
@@ -40,7 +47,7 @@ M.compile = function(cmd)
     -- line indexing is zero-based, so 3 means it's line number 4
     local line_nr = 3
     if M.config.auto_scroll then
-        vim.api.nvim_win_set_cursor(0, {line_nr+1, 0})
+        vim.api.nvim_win_set_cursor(bf.win, {line_nr+1, 0})
     end
 
     -- Define the callback for the job
@@ -48,7 +55,7 @@ M.compile = function(cmd)
         if data then
             for _, line in ipairs(data) do
                 -- Remove empty strings from the data
-                if line ~= "" then
+                -- if line ~= "" then
                     line_nr = line_nr + 1
                     -- print(string.format("%d: %s", line_nr, line))
 
@@ -67,7 +74,7 @@ M.compile = function(cmd)
                         -- Check cursor position, and auto scroll the window
                         bf.check_and_auto_scroll()
                     end
-                end
+                -- end
             end
         end
     end
@@ -82,28 +89,33 @@ M.compile = function(cmd)
         if exit_code == 0 then
             local end_msg = "Compilation finished at " .. os.date("%a %b %d %X")
             vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-            vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', end_msg})
+            -- start with -3 because the output has 2 last empty lines, so insert the end_msg from -3 line
+            vim.api.nvim_buf_set_lines(buf, -3, -1, false, {end_msg})
             vim.api.nvim_buf_set_option(buf, 'modifiable', false)
             -- Print the msg out and clear it after 1.75 seconds
-            print("Compilation finished")
+            vim.cmd('echon "Compilation finished"')
             vim.fn.timer_start(1750, function() vim.cmd([[echon ' ']]) end)
         else
             local err_msg = string.format("Compilation exited abnormally with code %d at %s", exit_code, os.date("%a %b %d %X"))
             vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-            vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', err_msg})
+            -- start with -3 because the output has 2 last empty lines, so insert the end_msg from -3 line
+            vim.api.nvim_buf_set_lines(buf, -3, -1, false, {err_msg})
             vim.api.nvim_buf_set_option(buf, 'modifiable', false)
             -- Print the msg out and clear it after 1.75 seconds
-            print("Compilation exited abnormally with code", exit_code)
+            vim.cmd('echon "Compilation exited abnormally with code "' .. exit_code)
             vim.fn.timer_start(1750, function() vim.cmd([[echon ' ']]) end)
         end
 
         if M.config.auto_scroll then
             -- To scroll to end of the buffer
             local line_count = vim.api.nvim_buf_line_count(buf)
-            if row == (line_count - 2) then
-                vim.api.nvim_win_set_cursor(0, {line_count, 0})
+            if row == (line_count - 1) then
+                vim.api.nvim_win_set_cursor(bf.win, {line_count, 0})
             end
         end
+
+        -- Clear job_id
+        M.job_id = nil
     end
 
     -- Start the job (execute the user command)
@@ -124,7 +136,8 @@ M.open_como_buffer = function()
     bf.buf_open()
 end
 
-M.quit_program = function()
+
+M.interrupt_program = function()
     -- Ctrl+c to quit program
     -- see como/buffer.lua
     if M.job_id then
@@ -133,6 +146,13 @@ M.quit_program = function()
     -- else
     --     print('Invalid job ID')
     end
+end
+
+M.add_new_matchers = function(new_matchers)
+    for matcher_name, data in pairs(new_matchers) do
+        mh.matcher_set[matcher_name] = data
+    end
+    -- print(vim.inspect(mh.matcher_set))
 end
 
 
@@ -178,6 +198,11 @@ M.setup = function(user_opts)
         M.config = vim.tbl_deep_extend("force", M.default_config, user_opts)
     else
         M.config = M.default_config
+    end
+
+    -- Add custom matchers to the matcher set
+    if M.config.custom_matchers ~= {} then
+        M.add_new_matchers(M.config.custom_matchers)
     end
 
     hl.init_hl_group()

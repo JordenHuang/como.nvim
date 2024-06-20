@@ -67,7 +67,7 @@ M.create_buf = function()
     -- Jump to file when hit enter
     vim.api.nvim_buf_set_keymap(buf, 'n', "<CR>", ":lua require('como.buffer').jump_to_file()<CR>", {silent=true, noremap=true, desc="como jump to file"})
     -- Quit program when hit Ctrl+c
-    vim.api.nvim_buf_set_keymap(buf, 'n', "<C-c>", ":lua require('como').quit_program()<CR>", {silent=true, noremap=true, desc="como quit program"})
+    vim.api.nvim_buf_set_keymap(buf, 'n', "<C-c>", ":lua require('como').interrupt_program()<CR>", {silent=true, noremap=true, desc="como quit program"})
 
     M.buf = buf
     return buf
@@ -198,17 +198,17 @@ end
 
 -- Auto scroll down
 M.check_and_auto_scroll = function()
-    if vim.api.nvim_get_current_win() ~= M.win then
-        -- print('not same win')
-        return
-    end
+    -- if vim.api.nvim_get_current_win() ~= M.win then
+    --     -- print('not same win')
+    --     return
+    -- end
 
     -- Get cursor's row position and number of lines in the compilation buffer
     local row = vim.api.nvim_win_get_cursor(M.win)[1]
 
     local line_count = vim.api.nvim_buf_line_count(M.buf)
     if row == (line_count-1) then
-        vim.api.nvim_win_set_cursor(0, {line_count, 0})
+        vim.api.nvim_win_set_cursor(M.win, {line_count, 0})
     end
 end
 

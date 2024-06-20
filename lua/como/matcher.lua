@@ -7,7 +7,7 @@ M.matcher_set = {
             "filename",
             "lnum",
             "col",
-            "qtype",
+            "etype",
             "message"
         }
     },

@@ -43,19 +43,19 @@ M.highlight_logic = function(vals, bufnr, line_nr)
         local parts = vals.parts
         local hl_group
 
-        -- Get qtype
-        local qtype
+        -- Get error type
+        local etype
         for _, part in ipairs(parts) do
-            if part[Pos.name] == "qtype" then
-                qtype = part
+            if part[Pos.name] == "etype" then
+                etype = part
                 break
             end
         end
-        if qtype ~= nil then
-            -- Determine the hl group for the current line base on qtype
-            if qtype[Pos.data] == "warning" then
+        if etype ~= nil then
+            -- Determine the hl group for the current line base on etype
+            if etype[Pos.data] == "warning" then
                 hl_group = 'Como_hl_warn'
-            elseif qtype[Pos.data] == "error" then
+            elseif etype[Pos.data] == "error" then
                 hl_group = 'Como_hl_error'
             else
                 hl_group = 'Normal'
