@@ -30,6 +30,12 @@ M.compile = function(cmd)
         vim.notify("Last command still running!", vim.log.levels.ERROR)
         return
     end
+
+    if not cmd then
+        print("Empty input, abort")
+        return
+    end
+
     local buf = bf.buf_open()
 
     -- Clear the buffer content

@@ -64,6 +64,8 @@ M.create_buf = function()
     vim.api.nvim_buf_set_option(buf, 'buflisted', false)
 
     vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ":q<CR>", {silent=true, noremap=true, desc="close como window"})
+    -- Pressing g to recompile
+    vim.api.nvim_buf_set_keymap(buf, 'n', 'r', ":Como recompile<CR>", {silent=true, noremap=true, desc="como recompile"})
     -- Jump to file when hit enter
     vim.api.nvim_buf_set_keymap(buf, 'n', "<CR>", ":lua require('como.buffer').jump_to_file()<CR>", {silent=true, noremap=true, desc="como jump to file"})
     -- Quit program when hit Ctrl+c

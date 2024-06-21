@@ -65,6 +65,8 @@ When the cursor is in the compilation buffer,
 
 - pressing `q` will close the buffer, and can be re-open by calling `:Como open`
 
+- pressing `r` will do recompile
+
 - pressing <CR> will jump to the line that occurs the error/warning, if the line with the cursor
 has the error/warning message
 
