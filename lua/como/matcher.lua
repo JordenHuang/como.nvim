@@ -3,13 +3,7 @@ local M = {}
 M.matcher_set = {
     gcc = {
         pattern = "(%S+):(%d+):(%d+): (%S+): (.+)",
-        parts = {
-            "filename",
-            "lnum",
-            "col",
-            "etype",
-            "message"
-        }
+        parts = { "filename", "lnum", "col", "etype", "message" }
     },
     python = {
         pattern = "  File \"(%S+)\", line (%d+), (.+)",
@@ -21,12 +15,12 @@ M.matcher_set = {
     },
     shell = {
         pattern = "(%S+): line (%d+): (.+)",
-        parts = {
-            "filename",
-            "lnum",
-            "message"
-        }
+        parts = { "filename", "lnum", "message" }
     },
+    rust = {
+        pattern = " --> (%S+):(%d+):(%d+)",
+        parts = { "filename", "lnum", "col" }
+    }
 }
 
 M.Pos = {
