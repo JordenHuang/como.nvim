@@ -3,7 +3,7 @@
 Como.nvim is a lua plugin that creates a buffer for compilation results in Neovim (**co**mpilation **mo**de).
 
 
-![demo.gif]()
+![demo.gif](./the_como_demo.gif)
 
 ## Features
 
