@@ -171,7 +171,7 @@ M.open_file_and_set_cursor = function(file_path, row, col)
         elseif win == M.jmp_to_file_win then
             has_last_win = true
             win_id = win
-            break
+            -- Don't break because the file might have opened in other windows
         end
     end
 

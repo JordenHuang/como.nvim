@@ -1,3 +1,6 @@
+-- TODO:
+-- 1. segment fault handle
+-- 2. como buffer toggle utility
 -- Maybe add ignore filenames, like when using the wrong command, the /bin/bash is jumpable in the como buffer
 local M = {}
 
@@ -23,7 +26,6 @@ M.commands = {
     "recompile",
     "open"
 }
-
 
 M.compile = function(cmd)
     if M.job_id then
@@ -86,6 +88,16 @@ M.compile = function(cmd)
     end
 
     local function on_exit(_, exit_code, _)
+        -- for sig, n in pairs(vim.uv.constants) do
+        --     if vim.startswith(sig, "SIG") then
+        --         -- print(sig, n)
+        --         if exit_code - 128 == n then
+        --             print("sig: ", sig)
+        --         end
+        --         break
+        --     end
+        -- end
+
         -- This variable is for auto scroll
         -- Get the current row
         -- for checking if it needs to scroll to the bottom when compilation finished
@@ -95,8 +107,8 @@ M.compile = function(cmd)
         if exit_code == 0 then
             local end_msg = "Compilation finished at " .. os.date("%a %b %d %X")
             vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-            -- start with -3 because the output has 2 last empty lines, so insert the end_msg from -3 line
-            vim.api.nvim_buf_set_lines(buf, -3, -1, false, {end_msg})
+            -- start with -3 because the output has 2 last empty lines, so insert the end_msg from -2 line
+            vim.api.nvim_buf_set_lines(buf, -2, -1, false, {end_msg})
             vim.api.nvim_buf_set_option(buf, 'modifiable', false)
             -- Print the msg out and clear it after 1.75 seconds
             vim.cmd('echon "Compilation finished"')
@@ -104,8 +116,8 @@ M.compile = function(cmd)
         else
             local err_msg = string.format("Compilation exited abnormally with code %d at %s", exit_code, os.date("%a %b %d %X"))
             vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-            -- start with -3 because the output has 2 last empty lines, so insert the end_msg from -3 line
-            vim.api.nvim_buf_set_lines(buf, -3, -1, false, {err_msg})
+            -- start with -3 because the output has 2 last empty lines, so insert the end_msg from -2 line
+            vim.api.nvim_buf_set_lines(buf, -2, -1, false, {err_msg})
             vim.api.nvim_buf_set_option(buf, 'modifiable', false)
             -- Print the msg out and clear it after 1.75 seconds
             vim.cmd('echon "Compilation exited abnormally with code "' .. exit_code)
