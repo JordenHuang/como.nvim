@@ -19,7 +19,7 @@ M.config = {}
 
 M.last_command = ""
 
-M.job_id = nil
+M.pid = nil
 
 M.commands = {
     "compile",
@@ -28,7 +28,7 @@ M.commands = {
 }
 
 M.compile = function(cmd)
-    if M.job_id then
+    if M.pid then
         vim.notify("Last command still running!", vim.log.levels.ERROR)
         return
     end
@@ -59,91 +59,106 @@ M.compile = function(cmd)
     end
 
     -- Define the callback for the job
-    local function on_output(_, data, _)
+    local function on_output(data)
         if data then
-            for _, line in ipairs(data) do
-                -- Remove empty strings from the data
-                -- if line ~= "" then
-                    line_nr = line_nr + 1
-                    -- print(string.format("%d: %s", line_nr, line))
+            local s = vim.split(data, '\n', {plain=true, trimempty = true})
+            for _, line in ipairs(s) do
+                line_nr = line_nr + 1
+                -- print(string.format("%d: %s", line_nr, line))
 
-                    -- Write lines to buffer
-                    vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-                    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {line})
-                    vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+                -- Write lines to buffer
+                vim.api.nvim_buf_set_option(buf, 'modifiable', true)
+                vim.api.nvim_buf_set_lines(buf, -1, -1, false, {line})
+                vim.api.nvim_buf_set_option(buf, 'modifiable', false)
 
-                    local result = mh.parse_line(line)
-                    -- print(vim.inspect(result))
+                local result = mh.parse_line(line)
+                -- print(vim.inspect(result))
 
-                    -- Adding highlight to the text
-                    hl.highlight_logic(result, buf, line_nr)
+                -- Adding highlight to the text
+                hl.highlight_logic(result, buf, line_nr)
 
-                    if M.config.auto_scroll then
-                        -- Check cursor position, and auto scroll the window
-                        bf.check_and_auto_scroll()
-                    end
-                -- end
+                if M.config.auto_scroll then
+                    -- Check cursor position, and auto scroll the window
+                    bf.check_and_auto_scroll()
+                end
             end
         end
     end
 
-    local function on_exit(_, exit_code, _)
-        -- for sig, n in pairs(vim.uv.constants) do
-        --     if vim.startswith(sig, "SIG") then
-        --         -- print(sig, n)
-        --         if exit_code - 128 == n then
-        --             print("sig: ", sig)
-        --         end
-        --         break
-        --     end
-        -- end
-
+    local function on_exit(exit_code, signal)
+        print('on exit:', exit_code, signal)
         -- This variable is for auto scroll
         -- Get the current row
         -- for checking if it needs to scroll to the bottom when compilation finished
         local row = vim.api.nvim_win_get_cursor(bf.win)[1]
 
         -- Write end message to buffer
+        -- TODO: add signal exam
         if exit_code == 0 then
             local end_msg = "Compilation finished at " .. os.date("%a %b %d %X")
             vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-            -- start with -3 because the output has 2 last empty lines, so insert the end_msg from -2 line
-            vim.api.nvim_buf_set_lines(buf, -2, -1, false, {end_msg})
+            vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', end_msg})
             vim.api.nvim_buf_set_option(buf, 'modifiable', false)
-            -- Print the msg out and clear it after 1.75 seconds
+            -- Print the msg out and clear it after 2.75 seconds
             vim.cmd('echon "Compilation finished"')
-            vim.fn.timer_start(1750, function() vim.cmd([[echon ' ']]) end)
+            vim.fn.timer_start(2750, function() vim.cmd([[echon ' ']]) end)
         else
             local err_msg = string.format("Compilation exited abnormally with code %d at %s", exit_code, os.date("%a %b %d %X"))
             vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-            -- start with -3 because the output has 2 last empty lines, so insert the end_msg from -2 line
-            vim.api.nvim_buf_set_lines(buf, -2, -1, false, {err_msg})
+            vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', err_msg})
             vim.api.nvim_buf_set_option(buf, 'modifiable', false)
-            -- Print the msg out and clear it after 1.75 seconds
+            -- Print the msg out and clear it after 2.75 seconds
             vim.cmd('echon "Compilation exited abnormally with code "' .. exit_code)
-            vim.fn.timer_start(1750, function() vim.cmd([[echon ' ']]) end)
+            vim.fn.timer_start(2750, function() vim.cmd([[echon ' ']]) end)
         end
 
         if M.config.auto_scroll then
             -- To scroll to end of the buffer
             local line_count = vim.api.nvim_buf_line_count(buf)
-            if row == (line_count - 1) then
+            if row == (line_count - 2) then
                 vim.api.nvim_win_set_cursor(bf.win, {line_count, 0})
             end
         end
 
-        -- Clear job_id
-        M.job_id = nil
+        -- Clear pid
+        M.pid = nil
     end
 
     -- Start the job (execute the user command)
-    M.job_id = vim.fn.jobstart(cmd, {
-        stdout_buffered = false,
-        stderr_buffered = false,
-        on_stdout = on_output,
-        on_stderr = on_output,
-        on_exit = on_exit
-    })
+    local handle
+    local stdout = vim.uv.new_pipe(false)
+    local stderr = vim.uv.new_pipe(false)
+    handle, M.pid = vim.uv.spawn(
+        'sh',
+        {
+            args = { '-c', cmd },
+            stdio = { nil, stdout, stderr }
+        },
+        function(exit_code, signal)
+            stdout:read_stop()
+            stderr:read_stop()
+            stdout:close()
+            stderr:close()
+            handle:close()
+            vim.schedule(function()
+                on_exit(exit_code, signal)
+            end)
+        end
+    )
+
+    stdout:read_start(function(err, data)
+        assert(not err, err)
+        vim.schedule(function()
+            on_output(data)
+        end)
+    end)
+
+    stderr:read_start(function(err, data)
+        assert(not err, err)
+        vim.schedule(function()
+            on_output(data)
+        end)
+    end)
 end
 
 M.recompile = function(cmd)
@@ -161,8 +176,12 @@ M.interrupt_program = function()
     if M.job_id then
         vim.fn.jobstop(M.job_id)
         -- print('Job stopped:', M.job_id)
-    -- else
-    --     print('Invalid job ID')
+        -- else
+        --     print('Invalid job ID')
+    end
+    if M.pid then
+        print('M.pid', M.pid)
+        vim.uv.kill(M.pid, 9)
     end
 end
 
@@ -198,14 +217,14 @@ M.determine_mode = function(opts)
                 M.last_command = cmd
             end
         )
-    -- Recompile
+        -- Recompile
     elseif opts.args == M.commands[2] then
         if M.last_command == '' then
             print("No last command, compile first")
             return
         end
         M.recompile(M.last_command)
-    -- Open como buffer
+        -- Open como buffer
     elseif opts.args == M.commands[3] then
         M.open_como_buffer()
     end
