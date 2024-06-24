@@ -119,8 +119,8 @@ M.jump_to_file = function()
             -- Try to find the file with its full path
             local ok, err = uv.fs_stat(file_path)
             if not ok then
-                print("Error to find file:")
-                print(err)
+                vim.notify("Error to find file:", vim.log.levels.ERROR)
+                vim.notify(err, vim.log.levels.ERROR)
                 return nil
                 -- else
                 --     print(file_path)

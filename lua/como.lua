@@ -1,7 +1,5 @@
 -- TODO:
--- 1. segment fault handle
--- 2. como buffer toggle utility
--- Maybe add ignore filenames, like when using the wrong command, the /bin/bash is jumpable in the como buffer
+-- 1. Maybe add ignore filenames, like when using the wrong command, the /bin/bash is jumpable in the como buffer
 local M = {}
 
 local bf = require('como.buffer')
@@ -24,7 +22,8 @@ M.pid = nil
 M.commands = {
     "compile",
     "recompile",
-    "open"
+    "open",
+    "toggle"
 }
 
 M.compile = function(cmd)
@@ -86,34 +85,40 @@ M.compile = function(cmd)
     end
 
     local function on_exit(exit_code, signal)
-        print('on exit:', exit_code, signal)
+        -- print('on exit:', exit_code, signal)
         -- This variable is for auto scroll
         -- Get the current row
         -- for checking if it needs to scroll to the bottom when compilation finished
         local row = vim.api.nvim_win_get_cursor(bf.win)[1]
 
         -- Write end message to buffer
-        -- TODO: add signal exam
-        if exit_code == 0 then
-            local end_msg = "Compilation finished at " .. os.date("%a %b %d %X")
-            vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-            vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', end_msg})
-            vim.api.nvim_buf_set_option(buf, 'modifiable', false)
-            -- Print the msg out and clear it after 2.75 seconds
-            vim.cmd('echon "Compilation finished"')
-            vim.fn.timer_start(2750, function() vim.cmd([[echon ' ']]) end)
+        local end_msg
+        local hl_group, hl_start, hl_end
+        if signal == 9 then
+            end_msg = "Compilation interrupted"
+            hl_group = 'Como_hl_error'
+            hl_start, hl_end = 12, 23
+        elseif exit_code ~= 0 then
+            end_msg = string.format("Compilation exited abnormally with code %d", exit_code)
+            hl_group = 'Como_hl_error'
+            hl_start, hl_end = 19, 29
         else
-            local err_msg = string.format("Compilation exited abnormally with code %d at %s", exit_code, os.date("%a %b %d %X"))
-            vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-            vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', err_msg})
-            vim.api.nvim_buf_set_option(buf, 'modifiable', false)
-            -- Print the msg out and clear it after 2.75 seconds
-            vim.cmd('echon "Compilation exited abnormally with code "' .. exit_code)
-            vim.fn.timer_start(2750, function() vim.cmd([[echon ' ']]) end)
+            end_msg = "Compilation finished"
+            hl_group = 'Como_hl_ok'
+            hl_start, hl_end = 12, 20
         end
+        -- Write end_msg to buffer
+        vim.api.nvim_buf_set_option(buf, 'modifiable', true)
+        vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', end_msg .. " at " .. os.date("%a %b %d %X")})
+        vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+        hl.apply_highlight(buf, hl_group, vim.api.nvim_buf_line_count(buf)-1, hl_start, hl_end)
 
+        -- Print the msg out and clear it after 2.75 seconds
+        vim.cmd('echon "' .. end_msg ..'"')
+        vim.fn.timer_start(2750, function() vim.cmd([[echon ' ']]) end)
+
+        -- To scroll to end of the buffer
         if M.config.auto_scroll then
-            -- To scroll to end of the buffer
             local line_count = vim.api.nvim_buf_line_count(buf)
             if row == (line_count - 2) then
                 vim.api.nvim_win_set_cursor(bf.win, {line_count, 0})
@@ -169,18 +174,21 @@ M.open_como_buffer = function()
     bf.buf_open()
 end
 
+M.toggle_como_buffer = function()
+    local buf_present = bf.if_buf_present(bf.buf)
+    if buf_present then
+        vim.api.nvim_win_hide(bf.win)
+    else
+        bf.buf_open()
+    end
+end
+
 
 M.interrupt_program = function()
     -- Ctrl+c to quit program
     -- see como/buffer.lua
-    if M.job_id then
-        vim.fn.jobstop(M.job_id)
-        -- print('Job stopped:', M.job_id)
-        -- else
-        --     print('Invalid job ID')
-    end
     if M.pid then
-        print('M.pid', M.pid)
+        -- print('M.pid:', M.pid)
         vim.uv.kill(M.pid, 9)
     end
 end
@@ -227,6 +235,8 @@ M.determine_mode = function(opts)
         -- Open como buffer
     elseif opts.args == M.commands[3] then
         M.open_como_buffer()
+    elseif opts.args == M.commands[4] then
+        M.toggle_como_buffer()
     end
 end
 

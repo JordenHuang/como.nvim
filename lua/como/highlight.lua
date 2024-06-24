@@ -6,6 +6,9 @@ local Pos = mh.Pos
 
 
 M.default_hl_val = {
+    ok = {
+        fg = string.format("#%06x",vim.api.nvim_get_hl(0, {name="DiagnosticSignOk"}).fg),
+    },
     warning = {
         fg = string.format("#%06x",vim.api.nvim_get_hl(0, {name="DiagnosticSignWarn"}).fg),
     },
@@ -24,6 +27,7 @@ M.init_hl_group = function()
     local val = M.default_hl_val
     local ns_id = vim.api.nvim_create_namespace('Como_ns')
     M.ns_id = ns_id
+    vim.api.nvim_set_hl(ns_id, 'Como_hl_ok', val.ok)
     vim.api.nvim_set_hl(ns_id, 'Como_hl_warn', val.warning)
     vim.api.nvim_set_hl(ns_id, 'Como_hl_error', val.error)
     vim.api.nvim_set_hl(ns_id, 'Como_hl_filename', val.filename)
