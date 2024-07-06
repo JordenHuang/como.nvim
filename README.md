@@ -70,6 +70,8 @@ When the cursor is in the compilation buffer,
 - pressing <CR> will jump to the line that occurs the error/warning, if the line with the cursor
 has the error/warning message
 
+- pressing `<C-c>` (ctrl+c) will interrupt the command
+
 The above maps are default, and can't be customed
 
 ## Usage
@@ -79,6 +81,8 @@ The above maps are default, and can't be customed
 - You can use `:Como recompile` to compile with the last command
 
 - If you close the compilation buffer and want to open it again, use `:Como open`
+
+- Or toggle the compilation buffer/window with the `:Como toggle` command
 
 <br>
 
@@ -94,6 +98,7 @@ end
 vim.api.nvim_set_keymap("n", "<leader>cc", ":Como compile<CR>", opts("Compile"))
 vim.api.nvim_set_keymap("n", "<leader>cr", ":Como recompile<CR>", opts("Recompile"))
 vim.api.nvim_set_keymap("n", "<leader>co", ":Como open<CR>", opts("Focus como buffer"))
+vim.api.nvim_set_keymap("n", "<leader>ct", ":Como toggle<CR>", opts("Toggle the como buffer/window"))
 ```
 
 ## Matchers

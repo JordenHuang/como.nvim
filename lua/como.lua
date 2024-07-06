@@ -1,5 +1,6 @@
 -- TODO:
--- 1. Maybe add ignore filenames, like when using the wrong command, the /bin/bash is jumpable in the como buffer
+-- 1. Rewrite highlight using vim.cmd
+-- 2. Maybe add ignore filenames, like when using the wrong command, the /bin/bash is jumpable in the como buffer
 local M = {}
 
 local bf = require('como.buffer')
@@ -60,6 +61,7 @@ M.compile = function(cmd)
     -- Define the callback for the job
     local function on_output(data)
         if data then
+            local win_valid = bf.if_buf_present(bf.buf)
             local s = vim.split(data, '\n', {plain=true, trimempty = true})
             for _, line in ipairs(s) do
                 line_nr = line_nr + 1
@@ -76,7 +78,7 @@ M.compile = function(cmd)
                 -- Adding highlight to the text
                 hl.highlight_logic(result, buf, line_nr)
 
-                if M.config.auto_scroll then
+                if M.config.auto_scroll and win_valid then
                     -- Check cursor position, and auto scroll the window
                     bf.check_and_auto_scroll()
                 end
@@ -89,11 +91,18 @@ M.compile = function(cmd)
         -- This variable is for auto scroll
         -- Get the current row
         -- for checking if it needs to scroll to the bottom when compilation finished
-        local row = vim.api.nvim_win_get_cursor(bf.win)[1]
+        local win_valid = vim.api.nvim_win_is_valid(bf.win)
+        local row
+        if win_valid then
+            row = vim.api.nvim_win_get_cursor(bf.win)[1]
+        else
+            vim.notify("Compilation ended, result is in the compilation buffer / ", vim.log.levels.WARN)
+        end
 
         -- Write end message to buffer
         local end_msg
         local hl_group, hl_start, hl_end
+        local ok_to_clear = false
         if signal == 9 then
             end_msg = "Compilation interrupted"
             hl_group = 'Como_hl_error'
@@ -106,6 +115,7 @@ M.compile = function(cmd)
             end_msg = "Compilation finished"
             hl_group = 'Como_hl_ok'
             hl_start, hl_end = 12, 20
+            ok_to_clear = true
         end
         -- Write end_msg to buffer
         vim.api.nvim_buf_set_option(buf, 'modifiable', true)
@@ -115,12 +125,12 @@ M.compile = function(cmd)
 
         -- Print the msg out and clear it after 2.75 seconds
         vim.cmd('echon "' .. end_msg ..'"')
-        vim.fn.timer_start(2750, function() vim.cmd([[echon ' ']]) end)
+        if ok_to_clear and win_valid then vim.fn.timer_start(2750, function() vim.cmd([[echon ' ']]) end) end
 
         -- To scroll to end of the buffer
-        if M.config.auto_scroll then
+        if M.config.auto_scroll and win_valid then
             local line_count = vim.api.nvim_buf_line_count(buf)
-            if row == (line_count - 2) then
+            if row and row == (line_count - 2) then
                 vim.api.nvim_win_set_cursor(bf.win, {line_count, 0})
             end
         end
@@ -190,6 +200,7 @@ M.interrupt_program = function()
     if M.pid then
         -- print('M.pid:', M.pid)
         vim.uv.kill(M.pid, 9)
+        M.pid = nil
     end
 end
 
