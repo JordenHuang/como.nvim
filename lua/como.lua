@@ -1,6 +1,5 @@
 -- TODO:
 -- 1. Rewrite highlight using vim.cmd
--- 2. Maybe add ignore filenames, like when using the wrong command, the /bin/bash is jumpable in the como buffer
 local M = {}
 
 local bf = require('como.buffer')

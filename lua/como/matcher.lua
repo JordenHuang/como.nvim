@@ -18,35 +18,52 @@ M.matcher_set = {
         parts = { "filename", "lnum", "message" }
     },
     rust = {
-        pattern = " --> (%S+):(%d+):(%d+)",
-        parts = { "filename", "lnum", "col" }
+        pattern = {
+            "([^%[%]]+)%S*: (.+)",
+            " --> (%S+):(%d+):(%d+)",
+        },
+        parts = {
+            { "etype", "message" },
+            { "filename", "lnum", "col" }
+        }
     }
 }
 
+M.parse_line = function(line)
+    for mname, matcher in pairs(M.matcher_set) do
+        local res = {}
+        local values = {}
+        if type(matcher.pattern) == "table" then
+            for i, v in ipairs(matcher.pattern) do
+                values = { string.match(line, v) }
+                if #values ~= 0 then
+                    res.parts = M.calc_position(matcher.parts[i], values, line)
+                    return res
+                end
+            end
+        else
+            values = { string.match(line, matcher.pattern) }
+            -- print(vim.inspect(values))
+
+            if #values ~= 0 then
+                -- res.mname = mname
+                -- res.mpattern = matcher.pattern
+                res.parts = M.calc_position(matcher.parts, values, line)
+                return res
+            end
+        end
+    end
+    return nil
+end
+
+
+-- res (in function M.calc_position)'s index
 M.Pos = {
     name = 1,
     start_col = 2,
     end_col = 3,
     data = 4
 }
-
-M.parse_line = function(line)
-    for mname, matcher in pairs(M.matcher_set) do
-        local res = {}
-        local values = { string.match(line, matcher.pattern) }
-        -- for a, b in ipairs(values) do
-        --     print(a, b)
-        -- end
-
-        if #values ~= 0 then
-            -- res.mname = mname
-            -- res.mpattern = matcher.pattern
-            res.parts = M.calc_position(matcher.parts, values, line)
-            return res
-        end
-    end
-    return nil
-end
 
 M.calc_position = function(parts, values, line)
     local res = {}
@@ -63,6 +80,7 @@ M.calc_position = function(parts, values, line)
         -- parts[i] is the part's name, like filename, lnum .etc
         res[i] = { parts[i], start_col, end_col, values[i] }
     end
+    print(vim.inspect(res))
     return res
 end
 

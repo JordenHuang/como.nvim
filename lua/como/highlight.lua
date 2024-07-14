@@ -43,43 +43,43 @@ end
 
 -- The logic for applying highlights to text
 M.highlight_logic = function(vals, bufnr, line_nr)
-    if vals ~= nil then
-        local parts = vals.parts
-        local hl_group
+    if vals == nil then return end
 
-        -- Get error type
-        local etype
-        for _, part in ipairs(parts) do
-            if part[Pos.name] == "etype" then
-                etype = part
-                break
-            end
+    local parts = vals.parts
+    local hl_group
+
+    -- Get error type
+    local etype
+    for _, part in ipairs(parts) do
+        if part[Pos.name] == "etype" then
+            etype = part
+            break
         end
-        if etype ~= nil then
-            -- Determine the hl group for the current line base on etype
-            if etype[Pos.data] == "warning" then
-                hl_group = 'Como_hl_warn'
-            elseif etype[Pos.data] == "error" then
-                hl_group = 'Como_hl_error'
-            else
-                hl_group = 'Normal'
-            end
-        else
+    end
+    if etype ~= nil then
+        -- Determine the hl group for the current line base on etype
+        if etype[Pos.data] == "warning" then
+            hl_group = 'Como_hl_warn'
+        elseif etype[Pos.data] == "error" then
             hl_group = 'Como_hl_error'
+        else
+            hl_group = 'Normal'
         end
+    else
+        hl_group = 'Como_hl_error'
+    end
 
-        -- Loop through the parts in the line, apply color to them
-        for _, part in ipairs(parts) do
-            if part[Pos.name] == "filename" then
-                M.apply_highlight(bufnr, 'Como_hl_filename', line_nr, part[Pos.start_col]-1, part[Pos.end_col])
-            elseif part[Pos.name] == "message" then
-                M.apply_highlight(bufnr, 'Normal', line_nr, part[Pos.start_col]-1, part[Pos.end_col])
-            else
-                M.apply_highlight(bufnr, hl_group, line_nr, part[Pos.start_col]-1, part[Pos.end_col])
-            end
-            -- @function: apply_highlight(bufnr, hl_group, line, start_col, end_col)
-            -- hl.apply_highlight(buf, 'Como_hl_error', line_nr, part[Pos.start_col]-1, part[Pos.end_col])
+    -- Loop through the parts in the line, apply color to them
+    for _, part in ipairs(parts) do
+        if part[Pos.name] == "filename" then
+            M.apply_highlight(bufnr, 'Como_hl_filename', line_nr, part[Pos.start_col]-1, part[Pos.end_col])
+        elseif part[Pos.name] == "message" then
+            M.apply_highlight(bufnr, 'Normal', line_nr, part[Pos.start_col]-1, part[Pos.end_col])
+        else
+            M.apply_highlight(bufnr, hl_group, line_nr, part[Pos.start_col]-1, part[Pos.end_col])
         end
+        -- @function: apply_highlight(bufnr, hl_group, line, start_col, end_col)
+        -- hl.apply_highlight(buf, 'Como_hl_error', line_nr, part[Pos.start_col]-1, part[Pos.end_col])
     end
 end
 
