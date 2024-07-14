@@ -48,6 +48,8 @@ For custom_matchers, please see [Matcher](#matchers) section
     show_last_cmd = true,
     -- Auto scorlls down in the compilation buffer if your cursor is on the last line
     auto_scroll = true,
+    -- Preferred window position, valid options: top, bottom, left, right (default is bottom)
+    preferred_win_pos = "bottom",
 
     custom_matchers = {
         -- You can add your matchers here, see Matcher section for detail. Heres an example in the default matcher set:
