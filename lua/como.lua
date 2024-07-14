@@ -8,6 +8,7 @@ local hl = require('como.highlight')
 M.default_config = {
     show_last_cmd = true,
     auto_scroll = true,
+    preferred_win_pos = "bottom",
     custom_matchers = {}
 }
 
@@ -35,7 +36,8 @@ M.compile = function(cmd)
         return
     end
 
-    local buf = bf.buf_open()
+    print(M.config.preferred_win_pos)
+    local buf = bf.buf_open(M.config.preferred_win_pos)
 
     -- Clear the buffer content
     vim.api.nvim_buf_set_option(buf, 'modifiable', true)
@@ -177,7 +179,7 @@ M.recompile = function(cmd)
 end
 
 M.open_como_buffer = function()
-    bf.buf_open()
+    bf.buf_open(M.config.preferred_win_pos)
 end
 
 M.toggle_como_buffer = function()
@@ -185,7 +187,7 @@ M.toggle_como_buffer = function()
     if buf_present then
         vim.api.nvim_win_hide(bf.win)
     else
-        bf.buf_open()
+        bf.buf_open(M.config.preferred_win_pos)
     end
 end
 

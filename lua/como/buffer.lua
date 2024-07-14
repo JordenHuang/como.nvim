@@ -75,10 +75,28 @@ M.create_buf = function()
     return buf
 end
 
-M.buf_open = function()
+local function win_open_cmd(preferred_win_pos)
+    local cmd = ''
+    if preferred_win_pos == "top" then
+        cmd = 'topleft split'
+    elseif preferred_win_pos == "left" then
+        cmd = 'topleft vsplit'
+    elseif preferred_win_pos == "right" then
+        cmd = 'belowright vsplit'
+    else
+        if preferred_win_pos ~= "bottom" then
+            print("[como.nvim] Invalid option for `preferred_win_pos`, use default value")
+        end
+        cmd = 'belowright split'
+    end
+    return cmd
+end
+
+M.buf_open = function(preferred_win_pos)
     local buf = M.buf
     local buf_valid = M.if_buf_is_valid(buf)
     local buf_present = M.if_buf_present(buf)
+    local cmd = win_open_cmd(preferred_win_pos)
 
     -- Create a buffer for the output
     if not buf_valid then
@@ -87,7 +105,7 @@ M.buf_open = function()
 
     -- Create a window to display the buffer
     if not buf_present then
-        vim.api.nvim_command('topleft split')
+        vim.api.nvim_command(cmd)
         local win = vim.api.nvim_get_current_win()
         vim.api.nvim_win_set_buf(win, buf)
         M.win = win
