@@ -19,7 +19,7 @@ M.matcher_set = {
     },
     rust = {
         pattern = {
-            "([^%[%]]+)%S*: (.+)",
+            "(%a+)%[?[%w]*%]?: (.+)",
             " --> (%S+):(%d+):(%d+)",
         },
         parts = {
@@ -43,7 +43,6 @@ M.parse_line = function(line)
             end
         else
             values = { string.match(line, matcher.pattern) }
-            -- print(vim.inspect(values))
 
             if #values ~= 0 then
                 -- res.mname = mname
@@ -80,16 +79,7 @@ M.calc_position = function(parts, values, line)
         -- parts[i] is the part's name, like filename, lnum .etc
         res[i] = { parts[i], start_col, end_col, values[i] }
     end
-    print(vim.inspect(res))
     return res
 end
-
--- M.test = function()
---     local s = ": unused variable ‘k’ [-Wunused-variable]"
---     print(s)
---     -- Needs to give 'plain' argument, or some operator will be treat as 'magic'. See :h string.find()
---     local start_col, end_col = string.find(s, ": unused variable ‘k’ [-Wunused-variable]", 1, true)
---     print(start_col, end_col)
--- end
 
 return M

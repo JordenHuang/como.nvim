@@ -115,6 +115,25 @@ gcc = {
 }
 ```
 
+For multi-line compiler message like rust compiler, the matcher can be written as below:
+
+```lua
+/* Example rust compiler message:
+error[E0423]: expected function, found macro `println`
+ --> demo.rs:4:5
+*/
+rust = {
+    pattern = {
+        "(%a+)%[?[%w]*%]?: (.+)",
+        " --> (%S+):(%d+):(%d+)",
+    },
+    parts = {
+        { "etype", "message" },
+        { "filename", "lnum", "col" }
+    }
+}
+```
+
 When encounter the error message like this:
 
 > test.c:18:13: error: expected ‘;’ before ‘}’ token
