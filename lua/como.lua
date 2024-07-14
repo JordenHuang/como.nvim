@@ -1,6 +1,5 @@
--- TODO:
--- 1. Rewrite highlight using vim.cmd
--- 2. Maybe add ignore filenames, like when using the wrong command, the /bin/bash is jumpable in the como buffer
+<<<<<<< HEAD
+>>>>>>> 9253c9d (Change highlight groups, using vim.cmd to create them)
 local M = {}
 
 local bf = require('como.buffer')
@@ -87,10 +86,9 @@ M.compile = function(cmd)
     end
 
     local function on_exit(exit_code, signal)
-        -- print('on exit:', exit_code, signal)
-        -- This variable is for auto scroll
+        -- Auto-scroll feature:
         -- Get the current row
-        -- for checking if it needs to scroll to the bottom when compilation finished
+        -- to check if it needs to scroll to the bottom when compilation finished
         local win_valid = vim.api.nvim_win_is_valid(bf.win)
         local row
         if win_valid then
@@ -213,8 +211,6 @@ end
 
 
 M.determine_mode = function(opts)
-    -- print("'" .. opts.args .. "'")
-
     -- Compile
     if opts.args == M.commands[1] then
         -- local default = M.config.show_last_cmd and M.last_command or ''

@@ -66,12 +66,4 @@ M.calc_position = function(parts, values, line)
     return res
 end
 
--- M.test = function()
---     local s = ": unused variable ‘k’ [-Wunused-variable]"
---     print(s)
---     -- Needs to give 'plain' argument, or some operator will be treat as 'magic'. See :h string.find()
---     local start_col, end_col = string.find(s, ": unused variable ‘k’ [-Wunused-variable]", 1, true)
---     print(start_col, end_col)
--- end
-
 return M
