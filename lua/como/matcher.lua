@@ -63,6 +63,7 @@ M.calc_position = function(parts, values, line)
         -- parts[i] is the part's name, like filename, lnum .etc
         res[i] = { parts[i], start_col, end_col, values[i] }
     end
+    -- print(vim.inspect(res))
     return res
 end
 
