@@ -36,7 +36,6 @@ M.compile = function(cmd)
         return
     end
 
-    print(M.config.preferred_win_pos)
     local buf = bf.buf_open(M.config.preferred_win_pos)
 
     -- Clear the buffer content
@@ -196,7 +195,12 @@ M.interrupt_program = function()
     -- Ctrl+c to quit program
     -- see como/buffer.lua
     if M.pid then
-        -- print('M.pid:', M.pid)
+        -- Kill child process first
+        local child_process = vim.api.nvim_get_proc_children(M.pid)
+        for i, v in ipairs(child_process) do
+            vim.uv.kill(v, 9)
+        end
+        -- Kill process
         vim.uv.kill(M.pid, 9)
         M.pid = nil
     end
