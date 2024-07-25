@@ -1,5 +1,3 @@
-<<<<<<< HEAD
->>>>>>> 9253c9d (Change highlight groups, using vim.cmd to create them)
 local M = {}
 
 local bf = require('como.buffer')
