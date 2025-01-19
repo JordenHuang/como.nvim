@@ -158,6 +158,8 @@ M.jump_to_file = function()
     end
 
     if file_path ~= nil and lnum ~= nil then
+        -- Escape the filename contians modifiers like "\t\n*?[{`$\\%#'\"|!<"
+        file_path = vim.fn.fnameescape(file_path)
         M.open_file_and_set_cursor(file_path, lnum, col)
     else
         return nil

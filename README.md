@@ -146,6 +146,10 @@ Any line that don't match any pattern in the matcher set will not have highlight
 
 Refer to [Lua documentation - Patterns](https://www.lua.org/pil/20.2.html) for how to write a pattern
 
+## Todo
+
+- [] Go to next/prev error/warning
+
 ## Contributing
 
 Contributions are welcome, if you fix an issue or add some features, feel free to open a pull request

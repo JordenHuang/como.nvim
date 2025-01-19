@@ -20,6 +20,10 @@ M.matcher_set = {
     rust = {
         pattern = " --> (%S+):(%d+):(%d+)",
         parts = { "filename", "lnum", "col" }
+    },
+    grep = {
+        pattern = "(%S+):(%d+):(.+)",
+        parts = { "filename", "lnum", "message" }
     }
 }
 

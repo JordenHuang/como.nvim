@@ -60,7 +60,7 @@ M.compile = function(cmd)
     local function on_output(data)
         if data then
             local win_valid = bf.if_buf_present(bf.buf)
-            local s = vim.split(data, '\n', {plain=true, trimempty = true})
+            local s = vim.split(data, '\n', {plain=true, trimempty = false})
             for _, line in ipairs(s) do
                 line_nr = line_nr + 1
                 -- print(string.format("%d: %s", line_nr, line))
@@ -116,7 +116,7 @@ M.compile = function(cmd)
         end
         -- Write end_msg to buffer
         vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-        vim.api.nvim_buf_set_lines(buf, -1, -1, false, {'', end_msg .. " at " .. os.date("%a %b %d %X")})
+        vim.api.nvim_buf_set_lines(buf, -2, -1, false, {'', end_msg .. " at " .. os.date("%a %b %d %X")})
         vim.api.nvim_buf_set_option(buf, 'modifiable', false)
         hl.apply_highlight(buf, hl_group, vim.api.nvim_buf_line_count(buf)-1, hl_start, hl_end)
 
