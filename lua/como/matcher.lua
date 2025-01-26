@@ -50,7 +50,8 @@ M.parse_line = function(line)
             matched_most = #value
         end
     end
-    if matched_most != -1 then
+
+    if matched_most ~= -1 then
         return res
     else
         return nil
