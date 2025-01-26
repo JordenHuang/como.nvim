@@ -43,11 +43,11 @@ M.parse_line = function(line)
         --     print(a, b)
         -- end
 
-        if #values ~= 0 and #value > matched_most then
+        if #values ~= 0 and #values > matched_most then
             -- res.mname = mname
             -- res.mpattern = matcher.pattern
             res.parts = M.calc_position(matcher.parts, values, line)
-            matched_most = #value
+            matched_most = #values
         end
     end
 
