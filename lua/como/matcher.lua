@@ -36,6 +36,7 @@ M.Pos = {
 
 M.parse_line = function(line)
     local matched_most = -1
+    local matched_result = nil
     for mname, matcher in pairs(M.matcher_set) do
         local res = {}
         local values = { string.match(line, matcher.pattern) }
@@ -47,12 +48,15 @@ M.parse_line = function(line)
             -- res.mname = mname
             -- res.mpattern = matcher.pattern
             res.parts = M.calc_position(matcher.parts, values, line)
+
             matched_most = #values
+            matched_result = res
         end
     end
 
     if matched_most ~= -1 then
-        return res
+        return matched_result
+        -- return res
     else
         return nil
     end
