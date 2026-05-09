@@ -1,0 +1,18 @@
+{
+    "client_id": "...", // Client id
+    "line": "...", // A line of the compilation output
+    "pure_text": "true|false", // True if no need to apply highlight, otherwise false
+    "parts": [
+        {
+            "part": "...", // One of "filename", "lnum" (line number), "col", "message", "etype" (error type)
+            "hg": "...", // Highlight group, one of "filename", "normal", "warning", "error"
+            "hp" : [start_col, end_col], // Starting and ending column for highlighting
+        },
+        {
+            "part": "...",
+            "hg": "...",
+            "hp" : [start_col, end_col],
+        },
+        // ...and more
+    ]
+}

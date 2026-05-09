@@ -1,0 +1,6 @@
+{
+    "client_id": "...", // Client id
+    "action": "run", // Either "run" or "kill"
+    "payload": "cmd", // Command to run
+    "cwd": "path", // Current working directory
+}
