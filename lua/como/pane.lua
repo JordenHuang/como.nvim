@@ -13,7 +13,7 @@ local Config = require('como.config')
 --- Create a window and attach buffer (create one if not exist) to it
 --- @field buf_open fun(self: como.pane, on_close: fun())
 ---
---- FIXME: Not used, provide a set unique name api?
+--- TODO: Not used, provide a set unique name api?
 --- @field buf_set_name fun(self: como.pane, name: string)
 ---
 --- Check if the buffer is displaying in one of the windows
@@ -22,7 +22,9 @@ local Config = require('como.config')
 --- Check if the buffer can be reuse
 --- @field buf_can_be_reused fun(self: como.pane): boolean
 ---
---- @field auto_scroll fun(self: como.pane)
+--- @field get_cursor fun(self: como.pane): integer[]
+--- @field set_cursor fun(self: como.pane, row: integer, col: integer)
+--- @field get_line_count fun(self: como.pane): integer
 ---
 --- @field append_lines fun(self: como.pane, lines: string[])
 --- @field clear_lines fun(self: como.pane)
@@ -104,14 +106,18 @@ function Pane:buf_can_be_reused()
     return true
 end
 
---- Scroll down if cursor is on second last row
-function Pane:auto_scroll()
-    local row = vim.api.nvim_win_get_cursor(self.win)[1]
-    local line_count = vim.api.nvim_buf_line_count(self.buf)
-    if row == (line_count-1) then
-        vim.api.nvim_win_set_cursor(self.win, {line_count, 0})
-    end
+function Pane:get_cursor()
+    return vim.api.nvim_win_get_cursor(self.win)
 end
+
+function Pane:set_cursor(row, col)
+    vim.api.nvim_win_set_cursor(self.win, {row, col})
+end
+
+function Pane:get_line_count()
+    return vim.api.nvim_buf_line_count(self.buf)
+end
+
 
 function Pane:append_lines(lines)
     vim.api.nvim_set_option_value('modifiable', true, { buf = self.buf })

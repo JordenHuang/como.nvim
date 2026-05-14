@@ -1,6 +1,3 @@
--- TODO:
--- 1. on_stdout's while loop also makes neovim lag
-
 local Pane = require('como.pane')
 local Parser = require('como.parser')
 local Config = require('como.config')
@@ -23,6 +20,7 @@ local Config = require('como.config')
 --- @field MAX_BATCH_SIZE integer
 --- @field private pane como.pane
 --- @field private stdout_buffer string
+--- @field private throttle_timer uv.uv_timer_t|nil
 --- @field private jmp_to_file_win integer
 ---
 --- @field run_command fun(self: como.worker, cmd: string|nil, cwd: string)
@@ -61,6 +59,7 @@ end
 --- @param worker_id integer
 Worker._unregister_worker = function(worker_id)
     Worker._worker_list[worker_id] = nil
+    Worker.throttle_timer:close()
 end
 
 --- Determine which worker (buffer) to use, like emacs
@@ -110,9 +109,11 @@ function Worker:new()
     obj.exit_info = nil
     obj.current_batch_size = 1
     obj.MIN_BATCH_SIZE = 32
-    obj.MAX_BATCH_SIZE = 1024*4
+    obj.MAX_BATCH_SIZE = 32
     obj.pane = Pane:new()
     obj.stdout_buffer = ""
+    obj.throttle_timer = vim.uv.new_timer()
+    obj.killed = false
     return obj
 end
 
@@ -163,8 +164,16 @@ function Worker:run_command(cmd, cwd)
     self.pane:set_begin_msg(cmd)
 
     if Config.auto_scroll then
-        vim.api.nvim_win_set_cursor(self.pane.win, {4, 0})
+        self.pane:set_cursor(4, 0)
     end
+
+    -- Reset
+    self.stdout_buffer = ""
+    self.line_queue = {}
+    self.is_processing = false
+    self.process_exited = false
+    self.exit_info = {}
+    self.killed = false
 
     self:spawn_process(cmd, cwd)
 
@@ -208,17 +217,26 @@ function Worker:on_stdout(err, data)
     assert(not err, err)
     if not data then return end
 
-    -- Get line and insert to line_queue
+    -- If process got killed, return
+    if self.killed then return end
+
     self.stdout_buffer = self.stdout_buffer .. data
+
+    local start_pos = 1
     while true do
-        local newline_pos = self.stdout_buffer:find("\n")
+        -- Find new line character from start_pos
+        local newline_pos = self.stdout_buffer:find("\n", start_pos, true)
         if not newline_pos then break end
 
-        local line = self.stdout_buffer:sub(1, newline_pos - 1)
-        self.stdout_buffer = self.stdout_buffer:sub(newline_pos + 1)
-
+        -- Get the line
+        local line = self.stdout_buffer:sub(start_pos, newline_pos - 1)
         table.insert(self.line_queue, line)
+
+        start_pos = newline_pos + 1
     end
+
+    -- Trim the buffer
+    self.stdout_buffer = self.stdout_buffer:sub(start_pos)
 
     if not self.is_processing and #self.line_queue > 0 then
         vim.schedule(function()
@@ -237,9 +255,9 @@ function Worker:on_exit(code, signal)
     local hl_group, hl_start, hl_end
     local ok_to_clear = false -- clear message or not
     if signal == 9 or signal == 15 then
-        end_msg = "Compilation interrupted"
+        end_msg = "Compilation interrupt"
         hl_group = 'Como_hl_error'
-        hl_start, hl_end = 12, 23
+        hl_start, hl_end = 12, 21
     elseif code ~= 0 then
         end_msg = string.format("Compilation exited abnormally with code %d", code)
         hl_group = 'Como_hl_error'
@@ -270,7 +288,7 @@ function Worker:on_exit(code, signal)
 end
 
 function Worker:process_queue()
-    if #self.line_queue == 0 then
+    if #self.line_queue == 0 or self.killed then
         if self.process_exited and self.exit_info then
             -- Process exited
             local end_msg = self.exit_info.end_msg
@@ -290,7 +308,7 @@ function Worker:process_queue()
 
             -- Auto scroll to last line
             if Config.auto_scroll then
-                vim.api.nvim_win_set_cursor(self.pane.win, {line_nr, 0})
+                self.pane:set_cursor(line_nr, 0)
             end
 
             -- Print the msg out and clear it after 2.75 seconds
@@ -298,10 +316,14 @@ function Worker:process_queue()
             vim.defer_fn(function() vim.cmd([[echon ' ']]) end, 2750)
         end
 
+        if self.killed then
+            self.line_queue = {}
+            self.killed = false
+        end
+
         -- Reset status
         self.is_processing = false
-        -- self.current_batch_size = self.MIN_BATCH_SIZE
-        self.current_batch_size = 1
+        self.current_batch_size = self.MIN_BATCH_SIZE
         return
     end
 
@@ -316,7 +338,7 @@ function Worker:process_queue()
     -- Update UI
     vim.api.nvim_set_option_value('modifiable', true, { buf = self.pane.buf })
 
-    local line_nr = vim.api.nvim_buf_line_count(self.pane.buf)
+    local line_nr = self.pane:get_line_count()
     local hl_group, start_col, end_col
     for _, line in ipairs(lines_to_process) do
         -- Append line to buffer
@@ -336,7 +358,9 @@ function Worker:process_queue()
 
     -- Auto scroll to last line if buf is displaying
     if Config.auto_scroll and self.pane:buf_is_displaying() then
-        self.pane:auto_scroll()
+        if self.pane:get_cursor()[1] == line_nr - #lines_to_process then
+            self.pane:set_cursor(line_nr, 0)
+        end
     end
 
     -- Update batch size for next iteration
@@ -345,13 +369,13 @@ function Worker:process_queue()
     -- Schedule next iteration
     -- If line_queue is not empty, schedule so it can continue process
     -- Else, output the exit messages
-    -- vim.schedule(function() self:process_queue() end)
-    vim.defer_fn(function() self:process_queue() end, 10000)
+    self.throttle_timer:start(50, 0, vim.schedule_wrap(function() self:process_queue() end))
 end
 
 function Worker:terminate_process()
     if self.job_obj and not self.job_obj:is_closing() then
         self.job_obj:kill(15)
+        self.killed = true
     end
 end
 
