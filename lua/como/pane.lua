@@ -28,7 +28,7 @@ local Config = require('como.config')
 ---
 --- @field append_lines fun(self: como.pane, lines: string[])
 --- @field clear_lines fun(self: como.pane)
---- @field set_begin_msg fun(self: como.pane, cmd: string)
+--- @field set_begin_msg fun(self: como.pane, cmd: string, cwd: string)
 ---
 --- line_nr is zero-indexed
 --- @field set_highlight fun(self: como.pane, hl_group: string, line_nr: integer, start_col: integer, end_col: integer)
@@ -131,9 +131,9 @@ function Pane:clear_lines()
     vim.api.nvim_set_option_value('modifiable', false, { buf = self.buf })
 end
 
-function Pane:set_begin_msg(cmd)
+function Pane:set_begin_msg(cmd, cwd)
     -- Write beginning message
-    local begin_msg = string.format("-*- mode: compilation; default-directory: \"%s\" -*-", vim.uv.cwd())
+    local begin_msg = string.format("-*- mode: compilation; default-directory: \"%s\" -*-", cwd)
     local start_time_msg = "Compilation started at " .. os.date("%a %b %d %X")
     vim.api.nvim_set_option_value('modifiable', true, { buf = self.buf })
     vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, {begin_msg, start_time_msg, '', cmd})

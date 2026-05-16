@@ -14,6 +14,7 @@ local Config = require('como.config')
 --- @field line_queue string[]
 --- @field is_processing boolean
 --- @field process_exited boolean
+--- @field killed boolean
 --- @field exit_info table|nil
 --- @field current_batch_size integer
 --- @field MIN_BATCH_SIZE integer
@@ -106,6 +107,7 @@ function Worker:new()
     obj.line_queue = {}
     obj.is_processing = false
     obj.process_exited = false
+    obj.killed = false
     obj.exit_info = nil
     obj.current_batch_size = 1
     obj.MIN_BATCH_SIZE = 32
@@ -113,7 +115,6 @@ function Worker:new()
     obj.pane = Pane:new()
     obj.stdout_buffer = ""
     obj.throttle_timer = vim.uv.new_timer()
-    obj.killed = false
     return obj
 end
 
@@ -161,7 +162,7 @@ function Worker:run_command(cmd, cwd)
     self:open_buffer()
 
     self.pane:clear_lines()
-    self.pane:set_begin_msg(cmd)
+    self.pane:set_begin_msg(cmd, vim.fn.fnamemodify(cwd, ":p:~"))
 
     if Config.auto_scroll then
         self.pane:set_cursor(4, 0)
@@ -215,7 +216,20 @@ end
 
 function Worker:on_stdout(err, data)
     assert(not err, err)
-    if not data then return end
+
+    -- Append remaining data in stdout_buffer when EOF (So the lines without newline in the end can be shown)
+    if not data then
+        if self.stdout_buffer and self.stdout_buffer ~= "" then
+            table.insert(self.line_queue, self.stdout_buffer)
+            self.stdout_buffer = ""
+
+            if not self.is_processing then
+                self.is_processing = true
+                vim.schedule(function() self:process_queue() end)
+            end
+        end
+        return
+    end
 
     -- If process got killed, return
     if self.killed then return end
@@ -376,6 +390,13 @@ function Worker:terminate_process()
     if self.job_obj and not self.job_obj:is_closing() then
         self.job_obj:kill(15)
         self.killed = true
+    else
+        if self.is_processing then
+            local choice = vim.fn.confirm("Process has exited, but outputs are still processing. Stop it?", "&Yes\n&No")
+            if choice == 1 then
+                self.killed = true
+            end
+        end
     end
 end
 
