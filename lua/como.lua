@@ -27,9 +27,19 @@ local Parser = require('como.parser')
 ---
 --- @field setup fun(user_opts: table)
 ---
+--- Semver
+--- @field version fun(): table
+---
 --- @field private sub_commands string[]
 --- @field private parse_sub_commands fun(opts: table)
 local Como = {
+    version = function()
+        return {
+            major = 0,
+            minor = 2,
+            patch = 0,
+        }
+    end,
     sub_commands = {
         "compile",
         "recompile",
@@ -148,13 +158,16 @@ Como.setup = function(user_opts)
 
     -- Add custom matchers to the matcher set
     if Config.custom_matchers ~= {} then
+        -- TODO: Check custom_matchers table
         Como.add_new_matchers(Config.custom_matchers)
     end
 
     -- Callback for setup keymap in como buffer
     if type(Config.set_buf_keymap_cb) ~= "function" then
-        vim.notify("[como.nvim] Invalid callback in Como.set_buf_keymap", vim.log.levels.ERROR)
-        Config.set_buf_keymap_cb = function()end
+        vim.notify(
+            "[como.nvim] Invalid type of `set_buf_keymap_cb`: Should be a function.",
+            vim.log.levels.ERROR
+        )
     end
 
     -- Initialize highlight group
