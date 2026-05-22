@@ -13,7 +13,6 @@ local Config = require('como.config')
 --- Create a window and attach buffer (create one if not exist) to it
 --- @field buf_open fun(self: como.pane, on_close: fun())
 ---
---- TODO: Not used, provide a set unique name api?
 --- @field buf_set_name fun(self: como.pane, name: string)
 ---
 --- Check if the buffer is displaying in one of the windows
@@ -172,7 +171,6 @@ function Pane:buf_create(on_close)
         once = true,
     })
 
-    -- TODO: Check this
     vim.api.nvim_create_autocmd({ "BufWinEnter" }, {
         buffer = self.buf,
         callback = function()

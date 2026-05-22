@@ -1,5 +1,6 @@
 local Pane = require('como.pane')
 local Parser = require('como.parser')
+local ErrorList = require('como.errorlist')
 local Config = require('como.config')
 
 --- @class como.worker
@@ -20,6 +21,7 @@ local Config = require('como.config')
 --- @field MIN_BATCH_SIZE integer
 --- @field MAX_BATCH_SIZE integer
 --- @field private pane como.pane
+--- @field private errorlist como.errorlist
 --- @field private stdout_buffer string
 --- @field private throttle_timer uv.uv_timer_t|nil
 --- @field private jmp_to_file_win integer
@@ -37,7 +39,18 @@ local Config = require('como.config')
 --- Toggle buffer, if not exist, tell pane to create one
 --- @field toggle_buffer fun(self: como.worker)
 ---
+--- @field set_unique_name fun(self:como.worker)
+---
+--- @field first_error fun(self: como.worker)
+--- @field last_error fun(self: como.worker)
+--- @field next_error fun(self: como.worker)
+--- @field prev_error fun(self: como.worker)
 --- @field jump_to_file fun(self: como.worker)
+---
+--- @field private _jump_to_index fun(self: como.worker, idx: integer)
+--- @field private _execute_jump fun(self: como.worker, e: como.errorlist.error)
+---
+--- row and col are 1-indexed
 --- @field private open_file_and_set_cursor fun(self: como.worker, path: string, row: integer, col: integer|nil)
 local Worker = {}
 Worker.__index = Worker
@@ -113,6 +126,7 @@ function Worker:new()
     obj.MIN_BATCH_SIZE = 32
     obj.MAX_BATCH_SIZE = 32
     obj.pane = Pane:new()
+    obj.errorlist = ErrorList:new()
     obj.stdout_buffer = ""
     obj.throttle_timer = vim.uv.new_timer()
     return obj
@@ -175,6 +189,7 @@ function Worker:run_command(cmd, cwd)
     self.process_exited = false
     self.exit_info = {}
     self.killed = false
+    self.errorlist:clear()
 
     self:spawn_process(cmd, cwd)
 
@@ -307,9 +322,7 @@ function Worker:process_queue()
             -- Process exited
             local end_msg = self.exit_info.end_msg
             local end_time = self.exit_info.end_time
-            vim.api.nvim_set_option_value('modifiable', true, { buf = self.pane.buf })
-            vim.api.nvim_buf_set_lines(self.pane.buf, -1, -1, false, { '', end_msg .. end_time })
-            vim.api.nvim_set_option_value('modifiable', false, { buf = self.pane.buf })
+            self.pane:append_lines({ '', end_msg .. end_time })
 
             local line_nr = vim.api.nvim_buf_line_count(self.pane.buf)
             local hl_group, start_col, end_col = self.exit_info.hl_group, self.exit_info.start_col, self.exit_info.end_col
@@ -349,26 +362,38 @@ function Worker:process_queue()
         table.insert(lines_to_process, table.remove(self.line_queue, 1))
     end
 
-    -- Update UI
-    vim.api.nvim_set_option_value('modifiable', true, { buf = self.pane.buf })
-
+    -- == Update UI ==
     local line_nr = self.pane:get_line_count()
-    local hl_group, start_col, end_col
-    for _, line in ipairs(lines_to_process) do
-        -- Append line to buffer
-        vim.api.nvim_buf_set_lines(self.pane.buf, -1, -1, false, {line})
 
-        -- Parse line and add highlight
+    -- Append line to buffer
+    self.pane:append_lines(lines_to_process)
+
+    -- Parse line and add highlight
+    for _, line in ipairs(lines_to_process) do
         local parsed_result = Parser.parse_line(line)
+
         if parsed_result then
-            hl_group, start_col, end_col = Parser.highlight_logic(parsed_result)
-            assert(hl_group and start_col and end_col)
-            self.pane:set_highlight(hl_group, line_nr, start_col, end_col)
+            local semantic_data, highlights = Parser.analyze_parsed_result(parsed_result)
+
+            -- Apply highlight
+            for _, hl in ipairs(highlights) do
+                local hl_group, start_col, end_col = table.unpack(hl)
+                self.pane:set_highlight(hl_group, line_nr, start_col, end_col)
+            end
+
+            -- Insert to errorlist if filename found
+            if semantic_data.filename then
+                self.errorlist:append(
+                    line_nr + 1,
+                    semantic_data.filename,
+                    semantic_data.lnum,
+                    semantic_data.col
+                )
+            end
         end
+
         line_nr = line_nr + 1
     end
-
-    vim.api.nvim_set_option_value('modifiable', false, { buf = self.pane.buf })
 
     -- Auto scroll to last line if buf is displaying
     if Config.auto_scroll and self.pane:buf_is_displaying() then
@@ -416,47 +441,91 @@ function Worker:toggle_buffer()
     end
 end
 
-function Worker:jump_to_file()
-    local line = vim.api.nvim_get_current_line()
+function Worker:set_unique_name()
+    self.pane:buf_set_name(
+        string.format("*compilation %d*", #Worker._worker_list + 1)
+    )
+end
 
-    local result = Parser.parse_line(line)
-    if result == nil then
-        return
+function Worker:first_error()
+    if self.errorlist:is_empty() then
+        return vim.notify("[como.nvim] No errors found", vim.log.levels.WARN)
+    end
+    self:_jump_to_index(1)
+end
+
+function Worker:last_error()
+    if self.errorlist:is_empty() then
+        return vim.notify("[como.nvim] No errors found", vim.log.levels.WARN)
+    end
+    self:_jump_to_index(self.errorlist:len())
+end
+
+function Worker:next_error()
+    if self.errorlist:is_empty() then
+        return vim.notify("[como.nvim] No errors found", vim.log.levels.WARN)
     end
 
-    -- Variables with default value nil
-    local file_path, lnum, col
-    -- Loop through the parts in the line, to get the filename, lnum (and probrobly col)
-    for _, part in ipairs(result.items) do
-        -- Get the filename
-        if part.part_name == "filename" then
-            file_path = vim.fn.fnamemodify(part.part_data, ":p")
-            -- Try to find the file with its full path
-            local ok, err = vim.uv.fs_stat(file_path)
-            if not ok then --- @cast err string
-                vim.notify("Error to find file: " .. file_path .. " with error: " .. err, vim.log.levels.ERROR)
-                return
-            end
-        end
-
-        -- Get the line number
-        if part.part_name == "lnum" then
-            lnum = tonumber(part.part_data)
-        end
-
-        -- Get the column number
-        if part.part_name == "col" then
-            col = tonumber(part.part_data)
-        end
-    end
-
-    if file_path ~= nil and lnum ~= nil then
-        -- Escape the filename contians modifiers like "\t\n*?[{`$\\%#'\"|!<"
-        file_path = vim.fn.fnameescape(file_path)
-        self:open_file_and_set_cursor(file_path, lnum, col)
+    if self.errorlist:get_idx() < self.errorlist:len() then
+        self:_jump_to_index(self.errorlist:get_idx() + 1)
     else
+        vim.notify("[como.nvim] Already at the last error", vim.log.levels.WARN)
+    end
+end
+
+function Worker:prev_error()
+    if self.errorlist:is_empty() then
+        return vim.notify("[como.nvim] No errors found", vim.log.levels.WARN)
+    end
+
+    if self.errorlist:get_idx() > 1 then
+        self:_jump_to_index(self.errorlist:get_idx() - 1)
+    else
+        vim.notify("[como.nvim] Already at the first error", vim.log.levels.WARN)
+    end
+end
+
+function Worker:jump_to_file()
+    if not self.pane:buf_is_displaying() then return end
+
+    local cursor_line = self.pane:get_cursor()[1]
+    local e, idx = self.errorlist:get(cursor_line)
+
+    -- No error on this line, return
+    if not e then return end
+    --- @cast idx integer
+
+    self.errorlist:set_idx(idx)
+    self:_execute_jump(e)
+end
+
+function Worker:_jump_to_index(idx)
+    self.errorlist:set_idx(idx)
+    local e = self.errorlist:get_with_index()
+
+    -- Update cursor line in como buffer
+    if self.pane:buf_is_displaying() then
+        self.pane:set_cursor(e.line_nr, 0)
+    end
+
+    self:_execute_jump(e)
+end
+
+function Worker:_execute_jump(e)
+    local file_path = vim.fn.fnamemodify(e.filename, ":p")
+
+    -- Check file existence
+    local ok, err = vim.uv.fs_stat(file_path)
+    if not ok then
+        vim.notify("[como.nvim] Cannot find file: " .. file_path .. " (" .. err .. ")", vim.log.levels.ERROR)
         return
     end
+
+    local lnum = e.lnum and tonumber(e.lnum) or 1
+    local col = e.col and tonumber(e.col) or 1
+
+    file_path = vim.fn.fnameescape(file_path)
+    self:open_file_and_set_cursor(file_path, lnum, col)
 end
 
 -- 1. Check if the file is already open in one of the windows.

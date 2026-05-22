@@ -24,14 +24,21 @@ local Parser = require('como.parser')
 ---
 --- Go to error location
 --- @field jump_to_file fun()
+--- @field first_error fun()
+--- @field last_error fun()
+--- @field next_error fun()
+--- @field prev_error fun()
+---
+--- @field set_unique_name fun()
+--- @field add_new_matchers fun(new_matchers: table)
 ---
 --- @field setup fun(user_opts: table)
 ---
 --- Semver
 --- @field version fun(): table
 ---
---- @field private sub_commands string[]
---- @field private parse_sub_commands fun(opts: table)
+--- @field sub_command_handlers table<string, fun()>
+--- @field parse_sub_commands fun(opts: table)
 local Como = {
     version = function()
         return {
@@ -40,14 +47,6 @@ local Como = {
             patch = 0,
         }
     end,
-    sub_commands = {
-        "compile",
-        "recompile",
-        "open",
-        "toggle",
-        "kill_compilation",
-        "jump_to_file",
-    },
 }
 
 Como.compile = function(cmd)
@@ -78,6 +77,13 @@ Como.toggle_como_buffer = function()
     worker:toggle_buffer()
 end
 
+Como.kill_compilation = function()
+    local worker = Worker.get_target_worker()
+    if not worker then return end
+
+    worker:terminate_process()
+end
+
 Como.jump_to_file = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
@@ -85,12 +91,39 @@ Como.jump_to_file = function()
     worker:jump_to_file()
 end
 
-
-Como.kill_compilation = function()
+Como.first_error = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
 
-    worker:terminate_process()
+    worker:first_error()
+end
+
+Como.last_error = function()
+    local worker = Worker.get_target_worker()
+    if not worker then return end
+
+    worker:last_error()
+end
+
+Como.next_error = function()
+    local worker = Worker.get_target_worker()
+    if not worker then return end
+
+    worker:next_error()
+end
+
+Como.prev_error = function()
+    local worker = Worker.get_target_worker()
+    if not worker then return end
+
+    worker:prev_error()
+end
+
+Como.set_unique_name = function()
+    local worker = Worker.get_target_worker()
+    if not worker then return end
+
+    worker:set_unique_name()
 end
 
 Como.add_new_matchers = function(new_matchers)
@@ -100,20 +133,11 @@ Como.add_new_matchers = function(new_matchers)
 end
 
 
-Como.parse_sub_commands = function(opts)
-    local worker = Worker.get_target_worker()
-    --- @type string
-    local worker_last_cmd = worker and worker.last_cmd or ''
-
-    if opts.args == Como.sub_commands[1] then
-        -- Compile
-        local default
-        if not Config.show_last_cmd then
-            default = ''
-        else
-            default = worker_last_cmd
-        end
-
+Como.sub_command_handlers = {
+    compile = function()
+        local worker = Worker.get_target_worker()
+        local worker_last_cmd = worker and worker.last_cmd or ''
+        local default = Config.show_last_cmd and worker_last_cmd or ''
         local completion = vim.fn.has("nvim-0.11.0") == 1 and "shellcmdline" or "file"
 
         vim.ui.input(
@@ -126,25 +150,36 @@ Como.parse_sub_commands = function(opts)
                 Como.compile(cmd)
             end
         )
-    elseif opts.args == Como.sub_commands[2] then
-        -- Recompile
+    end,
+    recompile = function()
+        local worker = Worker.get_target_worker()
+        local worker_last_cmd = worker and worker.last_cmd or ''
         if worker_last_cmd == '' then
             print("No last command, compile first")
             return
         end
         Como.recompile()
-    elseif opts.args == Como.sub_commands[3] then
-        -- Open como buffer
-        Como.open_como_buffer()
-    elseif opts.args == Como.sub_commands[4] then
-        -- Toggle como buffer
-        Como.toggle_como_buffer()
-    elseif opts.args == Como.sub_commands[5] then
-        -- Kill (terminate) process in buffer
-        Como.kill_compilation()
-    elseif opts.args == Como.sub_commands[6] then
-        -- Go to error location
-        Como.jump_to_file()
+    end,
+
+    open = function() Como.open_como_buffer() end,
+    toggle = function() Como.toggle_como_buffer() end,
+    kill_compilation = function() Como.kill_compilation() end,
+    jump_to_file = function() Como.jump_to_file() end,
+    first_error = function() Como.first_error() end,
+    last_error = function() Como.last_error() end,
+    next_error = function() Como.next_error() end,
+    prev_error = function() Como.prev_error() end,
+    set_unique_name = function() Como.set_unique_name() end,
+}
+
+Como.parse_sub_commands = function(opts)
+    local cmd_name = opts.args
+    local handler = Como.sub_command_handlers[cmd_name]
+
+    if handler then
+        handler()
+    else
+        vim.notify("[como.nvim] Unknown subcommand: " .. cmd_name, vim.log.levels.ERROR)
     end
 end
 
@@ -158,7 +193,7 @@ Como.setup = function(user_opts)
 
     -- Add custom matchers to the matcher set
     if Config.custom_matchers ~= {} then
-        -- TODO: Check custom_matchers table
+        -- TODO: Verify custom_matchers table
         Como.add_new_matchers(Config.custom_matchers)
     end
 
@@ -172,20 +207,6 @@ Como.setup = function(user_opts)
 
     -- Initialize highlight group
     Config.init_hl_group()
-
-    vim.api.nvim_create_user_command(
-        'Como',
-        function(opts)
-            Como.parse_sub_commands(opts)
-        end,
-        {
-            nargs = 1,
-            complete = function()
-                -- return completion candidates as a list-like table
-                return Como.sub_commands
-            end,
-        }
-    )
 end
 
 return Como
