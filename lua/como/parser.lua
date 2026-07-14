@@ -1,7 +1,5 @@
 --- @class (private) como.parser
 --- @field matcher_set table
---- @field parse_line fun(line: string): como.parser.parse_result|nil
---- @field calc_range fun(part_map: table, parts: table, line: string): como.parser.result_range[]
 local Parser = {}
 
 --- @class como.parser.parse_result
@@ -42,6 +40,8 @@ Parser.matcher_set = {
     }
 }
 
+--- @param line string
+--- @return como.parser.parse_result | nil
 Parser.parse_line = function(line)
     local matched_most = -1
     local matched_result = nil
@@ -62,6 +62,10 @@ Parser.parse_line = function(line)
     return matched_result
 end
 
+--- @param part_map table
+--- @param parts table
+--- @param line string
+--- @return como.parser.result_range[]
 Parser.calc_range = function(part_map, parts, line)
     --- @type como.parser.result_range[]
     local res = {}

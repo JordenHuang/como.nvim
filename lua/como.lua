@@ -5,40 +5,8 @@ local Parser = require('como.parser')
 --- Main Interface
 --- @class como
 ---
---- Public API
----
---- Compile with command
---- @field compile fun(cmd: string|nil)
----
---- Compile with last command
---- @field recompile fun()
----
---- Open como buffer
---- @field open_como_buffer fun()
----
---- Toggle como buffer
---- @field toggle_como_buffer fun()
----
---- Kill (terminate) process
---- @field kill_compilation fun()
----
---- Go to error location
---- @field jump_to_file fun()
---- @field first_error fun()
---- @field last_error fun()
---- @field next_error fun()
---- @field prev_error fun()
----
---- @field set_unique_name fun()
---- @field add_new_matchers fun(new_matchers: table)
----
---- @field setup fun(user_opts: table)
----
 --- Semver
 --- @field version fun(): table
----
---- @field sub_command_handlers table<string, fun()>
---- @field parse_sub_commands fun(opts: table)
 local Como = {
     version = function()
         return {
@@ -49,6 +17,8 @@ local Como = {
     end,
 }
 
+--- Compile with command
+--- @param cmd string|nil
 Como.compile = function(cmd)
     local worker, cwd = Worker.get_target_worker()
 
@@ -59,10 +29,12 @@ Como.compile = function(cmd)
     worker:run_command(cmd, cwd)
 end
 
+--- Compile with last command
 Como.recompile = function()
     Como.compile(nil)
 end
 
+--- Open como buffer
 Como.open_como_buffer = function()
     local worker = Worker.get_target_worker()
     if worker then
@@ -70,6 +42,7 @@ Como.open_como_buffer = function()
     end
 end
 
+--- Toggle como buffer
 Como.toggle_como_buffer = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
@@ -77,6 +50,7 @@ Como.toggle_como_buffer = function()
     worker:toggle_buffer()
 end
 
+--- Kill (terminate) process
 Como.kill_compilation = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
@@ -84,6 +58,7 @@ Como.kill_compilation = function()
     worker:terminate_process()
 end
 
+--- Go to error location in file
 Como.jump_to_file = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
@@ -91,6 +66,7 @@ Como.jump_to_file = function()
     worker:jump_to_file()
 end
 
+--- Go to first error location
 Como.first_error = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
@@ -98,6 +74,7 @@ Como.first_error = function()
     worker:first_error()
 end
 
+--- Go to last error location
 Como.last_error = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
@@ -105,6 +82,7 @@ Como.last_error = function()
     worker:last_error()
 end
 
+--- Go to next error location
 Como.next_error = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
@@ -112,6 +90,7 @@ Como.next_error = function()
     worker:next_error()
 end
 
+--- Go to previous error location
 Como.prev_error = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
@@ -119,6 +98,7 @@ Como.prev_error = function()
     worker:prev_error()
 end
 
+--- Set unique name to como buffer, if you are using many
 Como.set_unique_name = function()
     local worker = Worker.get_target_worker()
     if not worker then return end
@@ -126,6 +106,8 @@ Como.set_unique_name = function()
     worker:set_unique_name()
 end
 
+--- Add new matcher to parser
+--- @param new_matchers table
 Como.add_new_matchers = function(new_matchers)
     for matcher_name, data in pairs(new_matchers) do
         Parser.matcher_set[matcher_name] = data
@@ -133,6 +115,8 @@ Como.add_new_matchers = function(new_matchers)
 end
 
 
+--- private
+--- @type table<string, fun()>
 Como.sub_command_handlers = {
     compile = function()
         local worker = Worker.get_target_worker()
@@ -172,6 +156,8 @@ Como.sub_command_handlers = {
     set_unique_name = function() Como.set_unique_name() end,
 }
 
+--- private
+--- @param opts table
 Como.parse_sub_commands = function(opts)
     local cmd_name = opts.args
     local handler = Como.sub_command_handlers[cmd_name]
@@ -183,6 +169,7 @@ Como.parse_sub_commands = function(opts)
     end
 end
 
+--- @param user_opts table
 Como.setup = function(user_opts)
     if user_opts then
         local merged = vim.tbl_deep_extend("force", Config, user_opts)

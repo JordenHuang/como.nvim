@@ -5,9 +5,6 @@ local Config = require('como.config')
 
 --- @class como.worker
 ---
---- Constructor
---- @field new fun(self: como.worker): como.worker
----
 --- @field worker_id integer
 --- @field last_cmd string
 --- @field cwd string|nil
@@ -25,33 +22,6 @@ local Config = require('como.config')
 --- @field private stdout_buffer string
 --- @field private throttle_timer uv.uv_timer_t|nil
 --- @field private jmp_to_file_win integer
----
---- @field run_command fun(self: como.worker, cmd: string|nil, cwd: string)
---- @field private check_running fun(self: como.worker): boolean
---- @field private spawn_process fun(self: como.worker, cmd: string, cwd: string)
---- @field private on_stdout fun(self: como.worker, err: string, data: string)
---- @field private process_queue fun(self: como.worker)
---- @field terminate_process fun(self: como.worker)
----
---- Open buffer, if not exist, tell pane to create one
---- @field open_buffer fun(self: como.worker)
----
---- Toggle buffer, if not exist, tell pane to create one
---- @field toggle_buffer fun(self: como.worker)
----
---- @field set_unique_name fun(self:como.worker)
----
---- @field first_error fun(self: como.worker)
---- @field last_error fun(self: como.worker)
---- @field next_error fun(self: como.worker)
---- @field prev_error fun(self: como.worker)
---- @field jump_to_file fun(self: como.worker)
----
---- @field private _jump_to_index fun(self: como.worker, idx: integer)
---- @field private _execute_jump fun(self: como.worker, e: como.errorlist.error)
----
---- row and col are 1-indexed
---- @field private open_file_and_set_cursor fun(self: como.worker, path: string, row: integer, col: integer|nil)
 local Worker = {}
 Worker.__index = Worker
 
@@ -111,6 +81,8 @@ Worker.get_target_worker = function()
 end
 
 
+--- Constructor
+--- @return como.worker
 function Worker:new()
     local obj = setmetatable({}, self)
     obj.worker_id = self._register_worker(obj)
@@ -132,6 +104,8 @@ function Worker:new()
     return obj
 end
 
+--- @private
+--- @return boolean
 function Worker:check_running()
     -- Ask to terminate if last job is still running
     if self.job_obj then
@@ -154,6 +128,8 @@ function Worker:check_running()
     return false
 end
 
+--- @param cmd string|nil
+--- @param cwd string
 function Worker:run_command(cmd, cwd)
     if self:check_running() then
         return
@@ -197,6 +173,9 @@ function Worker:run_command(cmd, cwd)
     self.cwd = cwd
 end
 
+--- @private
+--- @param cmd string
+--- @param cwd string
 function Worker:spawn_process(cmd, cwd)
     if cmd == nil or cwd == nil then
         vim.notify("[como.nvim] Invalid command or cwd, cmd: " .. cmd .. ",cwd: " .. cwd, vim.log.levels.ERROR)
@@ -229,6 +208,9 @@ function Worker:spawn_process(cmd, cwd)
     self.job_obj = sysobj_or_err
 end
 
+--- @private
+--- @param err string
+--- @param data string
 function Worker:on_stdout(err, data)
     assert(not err, err)
 
@@ -316,6 +298,7 @@ function Worker:on_exit(code, signal)
     end
 end
 
+--- @private
 function Worker:process_queue()
     if #self.line_queue == 0 or self.killed then
         if self.process_exited and self.exit_info then
@@ -425,6 +408,7 @@ function Worker:terminate_process()
     end
 end
 
+--- Open buffer, if not exist, tell pane to create one
 function Worker:open_buffer()
     local function on_buffer_close()
         self:terminate_process()
@@ -433,6 +417,7 @@ function Worker:open_buffer()
     self.pane:buf_open(on_buffer_close)
 end
 
+--- Toggle buffer, if not exist, tell pane to create one
 function Worker:toggle_buffer()
     if self.pane:buf_is_displaying() then
         vim.api.nvim_win_hide(self.pane.win)
@@ -499,6 +484,8 @@ function Worker:jump_to_file()
     self:_execute_jump(e)
 end
 
+--- @private
+--- @param idx integer
 function Worker:_jump_to_index(idx)
     self.errorlist:set_idx(idx)
     local e = self.errorlist:get_with_index()
@@ -511,6 +498,8 @@ function Worker:_jump_to_index(idx)
     self:_execute_jump(e)
 end
 
+--- @private
+--- @param e como.errorlist.error
 function Worker:_execute_jump(e)
     local file_path = vim.fn.fnamemodify(e.filename, ":p")
 
@@ -533,6 +522,11 @@ end
 --     or use the last window which is opened by this function, if it exist,
 --     or Open a new window below and open the file if it's not already open.
 -- 3. Set the cursor to a specific (row, col) position.
+--- row and col are 1-indexed
+--- @private
+--- @param path string
+--- @param row integer
+--- @param col integer|nil
 function Worker:open_file_and_set_cursor(path, row, col)
     local is_file_open = false
     local win_id = nil

@@ -16,6 +16,7 @@ local Config = {
     hl_id = -1,
 }
 
+--- Default highlight values
 Config.default_hl_val = {
     ["ok"] = "DiagnosticSignOk",
     ["warning"] = "DiagnosticSignWarn",
@@ -25,6 +26,7 @@ Config.default_hl_val = {
 }
 
 
+--- Initialize highlight groups
 Config.init_hl_group = function()
     local val = Config.default_hl_val
     Config.hl_id = vim.api.nvim_create_namespace('Como_ns')

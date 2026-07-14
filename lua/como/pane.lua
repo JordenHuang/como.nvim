@@ -6,40 +6,11 @@ local Config = require('como.config')
 --- @field buf integer|nil
 --- @field win integer|nil
 --- @field autocmd_id integer|nil
----
---- Constructor
---- @field new fun(self: como.pane): como.pane
----
---- Create a window and attach buffer (create one if not exist) to it
---- @field buf_open fun(self: como.pane, on_close: fun())
----
---- @field buf_set_name fun(self: como.pane, name: string)
----
---- Check if the buffer is displaying in one of the windows
---- @field buf_is_displaying fun(self: como.pane): boolean
----
---- Check if the buffer can be reuse
---- @field buf_can_be_reused fun(self: como.pane): boolean
----
---- @field get_cursor fun(self: como.pane): integer[]
---- @field set_cursor fun(self: como.pane, row: integer, col: integer)
---- @field get_line_count fun(self: como.pane): integer
----
---- @field append_lines fun(self: como.pane, lines: string[])
---- @field clear_lines fun(self: como.pane)
---- @field set_begin_msg fun(self: como.pane, cmd: string, cwd: string)
----
---- line_nr is zero-indexed
---- @field set_highlight fun(self: como.pane, hl_group: string, line_nr: integer, start_col: integer, end_col: integer)
----
---- Create buffer, set options
---- @field private buf_create fun(self: como.pane, on_close: fun())
----
---- Delete buffer
---- @field private buf_delete fun(self: como.pane, on_close: fun()) 
 local Pane = {}
 Pane.__index = Pane
 
+--- Constructor
+--- @return como.pane
 function Pane:new()
     local obj = setmetatable({}, self)
     obj.buf = nil
@@ -48,6 +19,8 @@ function Pane:new()
     return obj
 end
 
+--- Create a window and attach buffer (create one if not exist) to it
+--- @param on_close fun() callback when closing buffer
 function Pane:buf_open(on_close)
     -- Create buffer if not valid
     if not self:buf_can_be_reused() then
@@ -79,10 +52,14 @@ function Pane:buf_open(on_close)
     end
 end
 
+--- Set buffer name
+--- @param name string
 function Pane:buf_set_name(name)
     vim.api.nvim_buf_set_name(self.buf, name)
 end
 
+--- Check if the buffer is displaying in one of the windows
+--- @return boolean
 function Pane:buf_is_displaying()
     if not self.buf then return false end
 
@@ -90,6 +67,8 @@ function Pane:buf_is_displaying()
     return #win_ids > 0
 end
 
+--- Check if the buffer can be reuse
+--- @return boolean
 function Pane:buf_can_be_reused()
     -- Check if buffer is created
     if not self.buf then return false end
@@ -105,31 +84,41 @@ function Pane:buf_can_be_reused()
     return true
 end
 
+--- Get cursor position, (1,0)-indexed
+--- @return integer[]
 function Pane:get_cursor()
     return vim.api.nvim_win_get_cursor(self.win)
 end
 
+--- Set cursor position, (1,0)-indexed
 function Pane:set_cursor(row, col)
     vim.api.nvim_win_set_cursor(self.win, {row, col})
 end
 
+--- Get line count
+--- @return integer
 function Pane:get_line_count()
     return vim.api.nvim_buf_line_count(self.buf)
 end
 
-
+--- Append lines
+--- @param lines string[]
 function Pane:append_lines(lines)
     vim.api.nvim_set_option_value('modifiable', true, { buf = self.buf })
     vim.api.nvim_buf_set_lines(self.buf, -1, -1, false, lines)
     vim.api.nvim_set_option_value('modifiable', false, { buf = self.buf })
 end
 
+--- Clear lines
 function Pane:clear_lines()
     vim.api.nvim_set_option_value('modifiable', true, { buf = self.buf })
     vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, {})
     vim.api.nvim_set_option_value('modifiable', false, { buf = self.buf })
 end
 
+--- Set begin message
+--- @param cmd string
+--- @param cwd string
 function Pane:set_begin_msg(cmd, cwd)
     -- Write beginning message
     local begin_msg = string.format("-*- mode: compilation; default-directory: \"%s\" -*-", cwd)
@@ -139,11 +128,19 @@ function Pane:set_begin_msg(cmd, cwd)
     vim.api.nvim_set_option_value('modifiable', false, { buf = self.buf })
 end
 
+--- Set highlight
+--- @param hl_group string
+--- @param line_nr integer zero-indexed
+--- @param start_col integer
+--- @param end_col integer
 function Pane:set_highlight(hl_group, line_nr, start_col, end_col)
     local hl_id = Config.hl_id
     vim.api.nvim_buf_add_highlight(self.buf, hl_id, hl_group, line_nr, start_col, end_col)
 end
 
+--- Create buffer, set options
+--- @private
+--- @param on_close fun()
 function Pane:buf_create(on_close)
     -- Create a new buffer
     local buf = vim.api.nvim_create_buf(true, false)
@@ -179,6 +176,8 @@ function Pane:buf_create(on_close)
     })
 end
 
+--- Delete buffer
+--- @private
 function Pane:buf_delete()
     if not self.buf then return end
 
